@@ -9,6 +9,7 @@
   <a href="#changes-and-rollback">Changes</a>&nbsp;&nbsp;&nbsp;
   <a href="#before-you-open-it">New apps</a>&nbsp;&nbsp;&nbsp;
   <a href="#permissions-youve-granted">Permissions</a>&nbsp;&nbsp;&nbsp;
+  <a href="#startup">Startup</a>&nbsp;&nbsp;&nbsp;
   <a href="#clean-up">Clean up</a>&nbsp;&nbsp;&nbsp;
   <a href="#for-ai-agents">For agents</a>&nbsp;&nbsp;&nbsp;
   <a href="#privacy">Privacy</a>&nbsp;&nbsp;&nbsp;
@@ -90,6 +91,12 @@ macOS tags every downloaded app until it's opened once. Teardown watches for app
 <img src="docs/screens/permissions.png" alt="Permissions page listing which apps can use the screen, microphone and camera, with buttons to take each back" />
 
 What an app *can* ask for is in its bundle. What you actually *said yes to* is in macOS's own permission records, and Teardown reads those too: screen recording, microphone, camera, input monitoring, Full Disk Access, automation, and the rest, with when each app was last active. Take any permission back with one click, or all the ones belonging to apps you haven't touched in six months. Teardown uses Apple's `tccutil`, so the app simply has to ask again. Reading the records needs Full Disk Access; changing nothing needs you to press a button.
+
+## Startup
+
+<img src="docs/screens/startup.png" alt="Startup page listing background services with the app each belongs to and a switch to turn it off" />
+
+Apps quietly install helpers that start at login or run before anyone logs in: updaters, license checkers, background daemons. Teardown lists every one, says which app it belongs to, whether it's running, whether it restarts itself, and flags the ones whose program was deleted long ago. Switch any of them off and it stays off after a restart; switch it back on and both steps are reversed. Nothing is deleted. Machine-wide items go through macOS's own password prompt.
 
 ## Notifications and the menu bar
 
@@ -178,6 +185,7 @@ Then open http://127.0.0.1:4711. The first pass over every app takes about a min
 | `server/versions.ts` | Keeps APFS clones of each app and rolls updates back |
 | `server/arrivals.ts` | Finds downloaded apps that have never been opened |
 | `server/permissions.ts` | Reads granted permissions and takes them back with `tccutil` |
+| `server/startup.ts` | Lists launch agents and daemons and switches them with `launchctl` |
 | `server/mcp.ts` | The MCP server for AI agents |
 | `server/knowledge.ts` | Known SDKs, entitlements and privacy keys |
 | `web/` | The React interface; the ring map is SVG laid out with `d3-hierarchy` |
