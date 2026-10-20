@@ -1,11 +1,13 @@
 import { CircleAlert, CircleCheck, CircleDot, FolderSearch, Info, RotateCw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import type { Report, Severity } from "../../../shared/types";
+import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, LiveApp, Report, Severity } from "../../../shared/types";
+import { ChangeList, when } from "./Changes";
 import { api } from "../api";
 import { STACK_COLOR, STACK_NAME, bytes } from "../format";
 import { Specimen } from "./Specimen";
+import { Button } from "./ui";
 
-const TABS = ["Built with", "Permissions", "Network", "Inside"] as const;
+const TABS = ["Built with", "Permissions", "Network", "Inside", "History"] as const;
 type Tab = (typeof TABS)[number];
 
 const SEVERITY_ICON: Record<Severity, typeof Info> = {
@@ -23,6 +25,7 @@ export function Teardown({ report, onRescan, rescanning }: { report: Report; onR
     Permissions: report.permissions.length + report.entitlements.length,
     Network: report.domains.length,
     Inside: report.frameworks.length + report.helpers.length + (report.npm?.packages.length ?? 0),
+    History: undefined,
   };
 
   return (
@@ -42,12 +45,8 @@ export function Teardown({ report, onRescan, rescanning }: { report: Report; onR
           </p>
         </div>
         <div className="td-actions">
-          <button className="ghost" onClick={() => api.reveal(report.path)}>
-            <FolderSearch size={16} aria-hidden /> Show in Finder
-          </button>
-          <button className="ghost" onClick={onRescan} disabled={rescanning}>
-            <RotateCw size={16} aria-hidden className={rescanning ? "spin" : undefined} /> {rescanning ? "Rescanning" : "Rescan"}
-          </button>
+          <Button icon={FolderSearch} onClick={() => api.reveal(report.path)}>Show in Finder</Button>
+          <Button icon={RotateCw} busy={rescanning} onClick={onRescan}>{rescanning ? "Rescanning" : "Rescan"}</Button>
         </div>
       </header>
 
@@ -93,6 +92,7 @@ export function Teardown({ report, onRescan, rescanning }: { report: Report; onR
         {tab === "Permissions" && <Permissions r={report} />}
         {tab === "Network" && <Network r={report} />}
         {tab === "Inside" && <Inside r={report} />}
+        {tab === "History" && <HistoryTab r={report} />}
       </div>
 
       <p className="td-foot">Read in {(report.analyzedMs / 1000).toFixed(1)} seconds, entirely on this Mac. Nothing was run or uploaded.</p>
@@ -191,13 +191,45 @@ function Permissions({ r }: { r: Report }) {
   );
 }
 
+function useLive(path: string) {
+  const [live, setLive] = useState<LiveApp | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.live().then((s) => alive && setLive(s.apps.find((a) => a.path === path) ?? null)).catch(() => {});
+    load();
+    const t = setInterval(load, 5_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [path]);
+  return live;
+}
+
 function Network({ r }: { r: Report }) {
   const [q, setQ] = useState("");
+  const live = useLive(r.path);
   const shown = useMemo(() => r.domains.filter((d) => d.host.includes(q.toLowerCase())), [r.domains, q]);
   const max = r.domains[0]?.count ?? 1;
   return (
     <div className="cols">
       <div>
+        <h3>Right now</h3>
+        {live === undefined && <p className="muted">Checking open connections.</p>}
+        {live === null && <p className="muted">{r.name} has no open connections. Open it and this updates within a few seconds.</p>}
+        {live && (
+          <ul className="conn-list compact">
+            {live.connections.map((c) => (
+              <li key={`${c.remote}:${c.port}`}>
+                <span className={`conn-dot${c.mentioned ? " known" : ""}`} aria-hidden />
+                <code className="conn-host" title={c.remote}>{c.host ?? c.remote}</code>
+                <span className="muted conn-port">port {c.port}</span>
+                {c.mentioned && <span className="conn-tag">In its code</span>}
+              </li>
+            ))}
+            {live.connections.length === 0 && <li className="muted">Only listening on {live.listening.join(", ")}.</li>}
+          </ul>
+        )}
         <h3>SDKs that phone home</h3>
         {r.sdks.length === 0 && <p className="muted">No known third-party SDKs found.</p>}
         <ul className="sdks">
@@ -294,6 +326,39 @@ function Inside({ r }: { r: Report }) {
             <p className="muted wrap">{r.documentTypes.slice(0, 30).join(", ")}</p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function HistoryTab({ r }: { r: Report }) {
+  const [data, setData] = useState<{ snapshots: { version?: string; takenAt: number }[]; changes: ChangeEvent[] } | null>(null);
+  useEffect(() => {
+    api.history(r.path).then(setData).catch(() => setData({ snapshots: [], changes: [] }));
+  }, [r.path]);
+  if (!data) return <p className="muted">Loading history.</p>;
+  return (
+    <div className="cols">
+      <div>
+        <h3>What changed between versions</h3>
+        {data.changes.length === 0 && (
+          <p className="muted">No updates recorded yet. Teardown took its first snapshot of {r.name}{data.snapshots[0] ? ` ${when(data.snapshots[0].takenAt)}` : ""}, and will compare the next version against it.</p>
+        )}
+        {data.changes.map((ev) => (
+          <div key={ev.id} className="history-event">
+            <p className="history-head"><strong>{ev.from ?? "?"} to {ev.to ?? "?"}</strong> <span className="muted">{when(ev.detectedAt)}</span></p>
+            <ChangeList event={ev} />
+          </div>
+        ))}
+      </div>
+      <div>
+        <h3>Snapshots</h3>
+        <ul className="helpers">
+          {data.snapshots.slice().reverse().map((s) => (
+            <li key={s.takenAt}><span>Version {s.version ?? "unknown"}</span><span className="muted">{new Date(s.takenAt).toLocaleString()}</span></li>
+          ))}
+          {data.snapshots.length === 0 && <li className="muted">None yet.</li>}
+        </ul>
       </div>
     </div>
   );

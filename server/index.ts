@@ -1,133 +1,149 @@
 import express from "express";
 import { promises as fs } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import type { AppEntry, QuickReport, Report } from "../shared/types.js";
-import { fullReport, quickReport } from "./analyze.js";
+import type { StorageInfo } from "../shared/types.js";
+import { cacheKey, findApps, getFull, getQuick, stamp, validApp } from "./apps.js";
+import { layout } from "./analyze.js";
+import { cleanupLog, scanCleanup, trash } from "./cleanup.js";
+import { checkNow, observe, readChanges, snapshotsFor, startWatching, watchStatus } from "./history.js";
+import { liveConnections, selfConnections } from "./network.js";
+import { CHANGES_FILE, CLEANUP_LOG, DATA_DIR, DIST_DIR, ICON_DIR, PORT, REPORT_DIR, SNAPSHOT_DIR, VERSION } from "./paths.js";
 import { readPlist, run } from "./run.js";
-
-const PORT = 4710;
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const cacheDir = path.join(root, ".cache");
-const iconDir = path.join(cacheDir, "icons");
-await fs.mkdir(iconDir, { recursive: true });
-
-const LOCATIONS: [string, AppEntry["location"]][] = [
-  ["/Applications", "applications"],
-  [path.join(os.homedir(), "Applications"), "user"],
-  ["/System/Applications", "system"],
-  ["/System/Applications/Utilities", "system"],
-];
-
-async function findApps(): Promise<AppEntry[]> {
-  const apps: AppEntry[] = [];
-  for (const [dir, location] of LOCATIONS) {
-    let names: string[] = [];
-    try {
-      names = await fs.readdir(dir);
-    } catch {
-      continue;
-    }
-    for (const n of names) {
-      const p = path.join(dir, n);
-      if (n.endsWith(".app")) apps.push({ name: n.replace(/\.app$/, ""), path: p, location });
-      else if (location !== "system" && !n.startsWith(".")) {
-        // Vendors like Adobe nest their apps one folder deep.
-        try {
-          for (const inner of await fs.readdir(p)) {
-            if (inner.endsWith(".app")) apps.push({ name: inner.replace(/\.app$/, ""), path: path.join(p, inner), location });
-          }
-        } catch {}
-      }
-    }
-  }
-  return apps.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// Only real app bundles may be analysed.
-async function validApp(p: unknown): Promise<string | undefined> {
-  if (typeof p !== "string" || !p.endsWith(".app") || !path.isAbsolute(p)) return undefined;
-  const resolved = path.resolve(p);
-  try {
-    const st = await fs.stat(path.join(resolved, "Contents"));
-    return st.isDirectory() ? resolved : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function stamp(app: string) {
-  try {
-    return (await fs.stat(path.join(app, "Contents", "Info.plist"))).mtimeMs;
-  } catch {
-    return 0;
-  }
-}
-
-const cacheKey = (app: string) => app.replace(/[^A-Za-z0-9]+/g, "_");
-
-async function cached<T>(kind: string, app: string, make: () => Promise<T>): Promise<T> {
-  const file = path.join(cacheDir, `${kind}-${cacheKey(app)}.json`);
-  const s = await stamp(app);
-  try {
-    const hit = JSON.parse(await fs.readFile(file, "utf8")) as { stamp: number; data: T };
-    if (hit.stamp === s) return hit.data;
-  } catch {}
-  const data = await make();
-  await fs.writeFile(file, JSON.stringify({ stamp: s, data }));
-  return data;
-}
-
-const inflight = new Map<string, Promise<unknown>>();
-function once<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const existing = inflight.get(key);
-  if (existing) return existing as Promise<T>;
-  const p = fn().finally(() => inflight.delete(key));
-  inflight.set(key, p);
-  return p;
-}
+import { dirStats, getSettings, readJson, updateSettings } from "./store.js";
 
 const app = express();
+app.use(express.json({ limit: "1mb" }));
 
-app.get("/api/apps", async (_req, res) => {
-  res.json(await findApps());
-});
-
-app.get("/api/quick", async (req, res) => {
-  const p = await validApp(req.query.path);
-  if (!p) return res.status(400).json({ error: "Not an app bundle" });
-  res.json(await once(`q:${p}`, () => cached<QuickReport>("quick", p, () => quickReport(p))));
-});
-
-app.get("/api/teardown", async (req, res) => {
-  const p = await validApp(req.query.path);
-  if (!p) return res.status(400).json({ error: "Not an app bundle" });
-  try {
-    const fresh = req.query.fresh === "1";
-    const make = () => fullReport(p);
-    const report = await once(`f:${p}:${fresh}`, () => (fresh ? make() : cached<Report>("full", p, make)));
-    res.json(report);
-  } catch (e) {
-    res.status(500).json({ error: `Couldn't read this app: ${(e as Error).message}` });
+// The UI and engine talk over localhost only; refuse anything that isn't from this machine.
+app.use("/api", (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && !/^(https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?|tauri:\/\/localhost)$/.test(origin)) {
+    return res.status(403).json({ error: "Teardown only answers requests from this Mac." });
   }
+  next();
 });
 
-app.get("/api/icon", async (req, res) => {
+const wrap = (fn: (req: express.Request, res: express.Response) => Promise<unknown>) => (req: express.Request, res: express.Response) => {
+  fn(req, res).catch((e: Error) => res.status(500).json({ error: e.message }));
+};
+
+app.get("/api/apps", wrap(async (_req, res) => {
+  res.json(await findApps());
+}));
+
+app.get("/api/quick", wrap(async (req, res) => {
+  const p = await validApp(req.query.path);
+  if (!p) return res.status(400).json({ error: "That isn't an app bundle." });
+  res.json(await getQuick(p));
+}));
+
+app.get("/api/teardown", wrap(async (req, res) => {
+  const p = await validApp(req.query.path);
+  if (!p) return res.status(400).json({ error: "That isn't an app bundle." });
+  const report = await getFull(p, req.query.fresh === "1");
+  observe(report).catch(() => {});
+  res.json(report);
+}));
+
+app.get("/api/history", wrap(async (req, res) => {
+  const p = await validApp(req.query.path);
+  if (!p) return res.status(400).json({ error: "That isn't an app bundle." });
+  const [snaps, changes] = await Promise.all([snapshotsFor(p), readChanges()]);
+  res.json({ snapshots: snaps.map((s) => ({ version: s.version, takenAt: s.takenAt })), changes: changes.filter((c) => c.path === p) });
+}));
+
+app.get("/api/changes", wrap(async (_req, res) => {
+  res.json({ events: await readChanges(), status: watchStatus() });
+}));
+
+app.post("/api/changes/check", wrap(async (_req, res) => {
+  checkNow().catch(() => {});
+  res.json(watchStatus());
+}));
+
+app.get("/api/live", wrap(async (_req, res) => {
+  res.json(await liveConnections());
+}));
+
+let lastScan: { at: number; data: Awaited<ReturnType<typeof scanCleanup>> } | undefined;
+app.get("/api/cleanup", wrap(async (req, res) => {
+  if (!lastScan || req.query.fresh === "1" || Date.now() - lastScan.at > 10 * 60_000) {
+    lastScan = { at: Date.now(), data: await scanCleanup() };
+  }
+  res.json(lastScan.data);
+}));
+
+app.post("/api/cleanup/trash", wrap(async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((x: unknown) => typeof x === "string") : [];
+  const results = await trash(ids);
+  if (lastScan) {
+    const moved = new Set(results.filter((r) => r.ok).map((r) => r.id));
+    lastScan.data = { ...lastScan.data, items: lastScan.data.items.filter((i) => !moved.has(i.id)) };
+  }
+  res.json(results);
+}));
+
+app.get("/api/cleanup/log", wrap(async (_req, res) => {
+  res.json(await cleanupLog());
+}));
+
+app.get("/api/settings", wrap(async (_req, res) => {
+  res.json(await getSettings());
+}));
+
+app.put("/api/settings", wrap(async (req, res) => {
+  const next = await updateSettings(req.body ?? {});
+  await startWatching();
+  res.json(next);
+}));
+
+app.get("/api/storage", wrap(async (_req, res) => {
+  const [reports, snapshots, icons, log] = await Promise.all([
+    dirStats(REPORT_DIR), dirStats(SNAPSHOT_DIR), dirStats(ICON_DIR), readJson<unknown[]>(CLEANUP_LOG, []),
+  ]);
+  const info: StorageInfo = { dataDir: DATA_DIR, reports, snapshots, icons, cleanupLog: log.length };
+  res.json(info);
+}));
+
+app.post("/api/storage/clear", wrap(async (req, res) => {
+  const what = String(req.query.what);
+  const targets: Record<string, string[]> = {
+    cache: [REPORT_DIR, ICON_DIR],
+    history: [SNAPSHOT_DIR, CHANGES_FILE, CLEANUP_LOG],
+  };
+  if (!targets[what]) return res.status(400).json({ error: "Unknown data type." });
+  for (const t of targets[what]) await fs.rm(t, { recursive: true, force: true });
+  res.status(204).end();
+}));
+
+app.get("/api/self", wrap(async (_req, res) => {
+  res.json({ ...(await selfConnections()), version: VERSION });
+}));
+
+app.post("/api/reveal", wrap(async (req, res) => {
+  const target = req.query.target === "data" ? DATA_DIR : req.query.target === "trash" ? path.join(process.env.HOME ?? "", ".Trash") : await validApp(req.query.path);
+  if (!target) return res.status(400).end();
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await run("open", req.query.target ? [target] : ["-R", target], 5_000);
+  res.status(204).end();
+}));
+
+app.get("/api/icon", wrap(async (req, res) => {
   const p = await validApp(req.query.path);
   if (!p) return res.status(400).end();
-  const out = path.join(iconDir, `${cacheKey(p)}-${Math.round(await stamp(p))}.png`);
-  try {
-    await fs.access(out);
-  } catch {
-    const info = (await readPlist(path.join(p, "Contents", "Info.plist"))) ?? {};
-    let icon = typeof info.CFBundleIconFile === "string" ? info.CFBundleIconFile : undefined;
-    if (!icon && typeof info.CFBundleIconName === "string") icon = info.CFBundleIconName;
-    const res_ = path.join(p, "Contents", "Resources");
-    let file = icon ? path.join(res_, icon.endsWith(".icns") ? icon : `${icon}.icns`) : undefined;
+  await fs.mkdir(ICON_DIR, { recursive: true });
+  const out = path.join(ICON_DIR, `${cacheKey(p)}-${await stamp(p)}.png`);
+  if (!(await fs.access(out).then(() => true, () => false))) {
+    const lay = await layout(p);
+    const info = (await readPlist(lay.info)) ?? {};
+    const icon = typeof info.CFBundleIconFile === "string" ? info.CFBundleIconFile : typeof info.CFBundleIconName === "string" ? info.CFBundleIconName : undefined;
+    const resDir = lay.ios ? lay.contents : path.join(lay.contents, "Resources");
+    const names = await fs.readdir(resDir).catch(() => [] as string[]);
+    let file = icon ? path.join(resDir, icon.endsWith(".icns") ? icon : `${icon}.icns`) : undefined;
     if (!file || !(await fs.access(file).then(() => true, () => false))) {
-      const any = (await fs.readdir(res_).catch(() => [])).find((f) => f.endsWith(".icns"));
-      file = any ? path.join(res_, any) : undefined;
+      // iPhone apps ship PNG app icons instead of an .icns file; take the largest.
+      const pick = names.find((f) => f.endsWith(".icns")) ?? names.filter((f) => /^AppIcon.*\.png$/.test(f)).sort((a, b) => b.length - a.length || b.localeCompare(a))[0];
+      file = pick ? path.join(resDir, pick) : undefined;
     }
     if (!file) return res.status(404).end();
     const r = await run("sips", ["-s", "format", "png", "-Z", "256", file, "--out", out], 10_000);
@@ -135,18 +151,14 @@ app.get("/api/icon", async (req, res) => {
   }
   res.setHeader("Cache-Control", "public, max-age=86400");
   res.sendFile(out, { dotfiles: "allow" });
-});
+}));
 
-app.post("/api/reveal", async (req, res) => {
-  const p = await validApp(req.query.path);
-  if (!p) return res.status(400).end();
-  await run("open", ["-R", p], 5_000);
-  res.status(204).end();
+app.use(express.static(DIST_DIR));
+app.get(/^\/(?!api\/).*/, (_req, res, next) => {
+  res.sendFile(path.join(DIST_DIR, "index.html"), (err) => err && next());
 });
-
-const dist = path.join(root, "dist");
-app.use(express.static(dist));
 
 app.listen(PORT, "127.0.0.1", () => {
-  console.log(`Teardown analysis server on http://127.0.0.1:${PORT}`);
+  console.log(`Teardown engine on http://127.0.0.1:${PORT} (data in ${DATA_DIR})`);
+  startWatching().catch(() => {});
 });

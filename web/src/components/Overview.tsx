@@ -8,9 +8,10 @@ interface Props {
   apps: AppEntry[];
   quick: Record<string, QuickReport>;
   onOpen: (path: string) => void;
+  reclaim?: number;
 }
 
-export function Overview({ apps, quick, onOpen }: Props) {
+export function Overview({ apps, quick, onOpen, reclaim }: Props) {
   // System apps are all Apple's; the interesting picture is what you installed.
   const mine = apps.filter((a) => a.location !== "system");
   const read = mine.map((a) => quick[a.path]).filter(Boolean) as QuickReport[];
@@ -46,6 +47,11 @@ export function Overview({ apps, quick, onOpen }: Props) {
             {Math.round((engineBytes / Math.max(1, total)) * 100)}% of everything in your Applications folder.
           </p>
         )}
+        {reclaim ? (
+          <p className="ov-next">
+            <a href="#/cleanup">You could free up {bytes(reclaim)}</a> from caches, leftovers and apps you've stopped using.
+          </p>
+        ) : null}
       </header>
 
       {read.length > 0 && (

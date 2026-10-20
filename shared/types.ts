@@ -150,3 +150,142 @@ export interface Report extends QuickReport {
   fileCount: number;
   analyzedMs: number;
 }
+
+// ---------- settings ----------
+
+export interface Settings {
+  watch: boolean;
+  intervalMinutes: number;
+  includeSystem: boolean;
+  staleDays: number;
+}
+
+export interface StorageInfo {
+  dataDir: string;
+  reports: { files: number; bytes: number };
+  snapshots: { files: number; bytes: number };
+  icons: { files: number; bytes: number };
+  cleanupLog: number;
+}
+
+export interface SelfConnections {
+  pid: number;
+  port: number;
+  outbound: Connection[];
+  listening: string[];
+  checkedAt: number;
+}
+
+// ---------- watching for changes ----------
+
+// The parts of a report worth comparing between two versions of an app.
+export interface Fingerprint {
+  // Which analysis produced this snapshot; snapshots from older engines are never compared.
+  engine?: number;
+  path: string;
+  name: string;
+  bundleId?: string;
+  version?: string;
+  stamp: number;
+  takenAt: number;
+  stack: Stack;
+  stackLabel: string;
+  archs: string[];
+  sizeBytes: number;
+  sandboxed: boolean;
+  teamId?: string;
+  authority?: string;
+  notarized?: boolean;
+  hardenedRuntime: boolean;
+  electron?: string;
+  chromium?: string;
+  sdks: { name: string; category: SdkCategory }[];
+  permissions: { label: string; reason: string }[];
+  entitlements: { key: string; label?: string; risky: boolean }[];
+  frameworks: { name: string; size: number }[];
+  npm: { name: string; version?: string }[];
+  domains: string[];
+}
+
+export interface Change {
+  severity: Severity;
+  title: string;
+  detail?: string;
+}
+
+export interface ChangeEvent {
+  id: string;
+  path: string;
+  name: string;
+  bundleId?: string;
+  from?: string;
+  to?: string;
+  detectedAt: number;
+  changes: Change[];
+}
+
+export interface WatchStatus {
+  watching: boolean;
+  baselined: number;
+  total: number;
+  queue: number;
+  lastCheck?: number;
+  nextCheck?: number;
+  current?: string;
+}
+
+// ---------- live connections ----------
+
+export interface Connection {
+  remote: string;
+  port: number;
+  host?: string;
+  protocol: string;
+  state?: string;
+  process: string;
+  mentioned?: boolean;
+}
+
+export interface LiveApp {
+  path: string;
+  name: string;
+  pids: number[];
+  connections: Connection[];
+  listening: string[];
+  mentionedTotal?: number;
+}
+
+export interface LiveSnapshot {
+  apps: LiveApp[];
+  at: number;
+}
+
+// ---------- cleanup ----------
+
+export type CleanupCategory = "leftovers" | "caches" | "stale-apps" | "broken-login-items" | "intel-only";
+
+export interface CleanupItem {
+  id: string;
+  category: CleanupCategory;
+  path: string;
+  label: string;
+  detail: string;
+  bytes: number;
+  removable: boolean;
+  owner?: string;
+  lastUsed?: number;
+}
+
+export interface CleanupScan {
+  items: CleanupItem[];
+  scannedAt: number;
+  ms: number;
+}
+
+export interface TrashResult {
+  id: string;
+  path: string;
+  ok: boolean;
+  error?: string;
+  bytes: number;
+}

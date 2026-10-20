@@ -2,3 +2,10 @@ node_modules
 dist
 .cache
 .DS_Store
+build
+src-tauri/target
+src-tauri/gen
+src-tauri/binaries
+build-app.log
+bundle-dmg.log
+bundle-app.log

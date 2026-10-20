@@ -86,6 +86,7 @@ export const PRIVACY_LABELS: Record<string, string> = {
   NSLocationUsageDescription: "Location",
   NSLocationWhenInUseUsageDescription: "Location",
   NSLocationAlwaysUsageDescription: "Location (always)",
+  NSLocationAlwaysAndWhenInUseUsageDescription: "Location (always)",
   NSContactsUsageDescription: "Contacts",
   NSCalendarsUsageDescription: "Calendars",
   NSCalendarsFullAccessUsageDescription: "Calendars",

@@ -6,7 +6,10 @@
     "dev": "concurrently -k -n server,web -c cyan,magenta \"tsx watch server/index.ts\" \"vite\"",
     "build": "vite build",
     "start": "tsx server/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:engine": "./scripts/build-engine.sh",
+    "app": "vite build && ./scripts/build-engine.sh && tauri build",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -21,6 +24,7 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/d3-shape": "^3.2.0",
     "@types/express": "^5.0.6",
@@ -33,5 +37,6 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
-  }
+  },
+  "version": "0.2.0"
 }

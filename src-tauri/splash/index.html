@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Teardown</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #07111C; color: #6C8299; font: 500 14px/1.4 -apple-system, system-ui, sans-serif; }
+  body { display: grid; place-items: center; }
+  .wrap { display: grid; justify-items: center; gap: 18px; }
+  .mark { width: 72px; height: 72px; animation: turn 2.4s linear infinite; filter: drop-shadow(0 0 18px #7FD3FF66); }
+  @keyframes turn { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .mark { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="mark" src="logo.svg" alt="" />
+    <p>Starting the engine</p>
+  </div>
+</body>
+</html>

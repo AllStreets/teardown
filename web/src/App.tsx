@@ -1,10 +1,34 @@
-import { LayoutGrid, Search } from "lucide-react";
+import { Activity, History, LayoutGrid, Search, Settings as SettingsIcon, Sparkles, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AppEntry, QuickReport, Report } from "../../shared/types";
+import type { AppEntry, CleanupScan, QuickReport, Report, Settings } from "../../shared/types";
 import { api } from "./api";
-import { STACK_COLOR } from "./format";
+import { STACK_COLOR, bytes } from "./format";
+import { Changes } from "./components/Changes";
+import { Cleanup } from "./components/Cleanup";
+import { Live } from "./components/Live";
 import { Overview } from "./components/Overview";
+import { SettingsPage } from "./components/Settings";
 import { Teardown } from "./components/Teardown";
+
+type Route =
+  | { page: "overview" }
+  | { page: "changes" }
+  | { page: "live" }
+  | { page: "cleanup" }
+  | { page: "settings" }
+  | { page: "app"; path: string };
+
+function parse(): Route {
+  const h = location.hash.replace(/^#\/?/, "");
+  if (h.startsWith("app/")) return { page: "app", path: decodeURIComponent(h.slice(4)) };
+  if (h === "changes" || h === "live" || h === "cleanup" || h === "settings") return { page: h };
+  return { page: "overview" };
+}
+
+export const go = (to: string) => {
+  location.hash = to;
+};
+export const openApp = (path: string) => go(`#/app/${encodeURIComponent(path)}`);
 
 const SECTIONS: [AppEntry["location"], string][] = [
   ["applications", "Applications"],
@@ -12,28 +36,30 @@ const SECTIONS: [AppEntry["location"], string][] = [
   ["system", "Comes with macOS"],
 ];
 
-function routePath() {
-  const m = location.hash.match(/^#\/app\/(.+)$/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 export function App() {
+  const [route, setRoute] = useState<Route>(parse());
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [quick, setQuick] = useState<Record<string, QuickReport>>({});
-  const [selected, setSelected] = useState<string | null>(routePath());
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [filter, setFilter] = useState("");
+  const [badges, setBadges] = useState<{ changes?: number; live?: number; reclaim?: number }>({});
+  const [cleanupScan, setCleanupScan] = useState<CleanupScan | null>(null);
 
   useEffect(() => {
-    const onHash = () => setSelected(routePath());
+    const onHash = () => setRoute(parse());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  // Load the app list, then read every installed app in the background.
+  useEffect(() => {
+    api.settings().then(setSettings).catch(() => {});
+  }, []);
+
+  // Read every installed app in the background so the overview fills in live.
   useEffect(() => {
     let cancelled = false;
     api.apps().then(async (list) => {
@@ -44,8 +70,8 @@ export function App() {
         while (queue.length && !cancelled) {
           const a = queue.shift()!;
           try {
-            const q = await api.quick(a.path);
-            if (!cancelled) setQuick((prev) => ({ ...prev, [a.path]: q }));
+            const r = await api.quick(a.path);
+            if (!cancelled) setQuick((prev) => ({ ...prev, [a.path]: r }));
           } catch {}
         }
       };
@@ -56,16 +82,29 @@ export function App() {
     };
   }, []);
 
+  // Counts shown next to each page in the sidebar.
   useEffect(() => {
-    if (!selected) {
-      setReport(null);
-      return;
-    }
+    const refresh = () => {
+      api.changes().then((c) => setBadges((b) => ({ ...b, changes: c.events.length }))).catch(() => {});
+      api.live().then((l) => setBadges((b) => ({ ...b, live: l.apps.filter((a) => a.connections.length).length }))).catch(() => {});
+    };
+    refresh();
+    const t = setInterval(refresh, 30_000);
+    api.cleanup().then((s) => {
+      setCleanupScan(s);
+      setBadges((b) => ({ ...b, reclaim: s.items.filter((i) => i.removable).reduce((a, i) => a + i.bytes, 0) }));
+    }).catch(() => {});
+    return () => clearInterval(t);
+  }, []);
+
+  const selected = route.page === "app" ? route.path : null;
+
+  useEffect(() => {
+    if (!selected) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api
-      .teardown(selected)
+    api.teardown(selected)
       .then((r) => !cancelled && setReport(r))
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
@@ -73,10 +112,6 @@ export function App() {
       cancelled = true;
     };
   }, [selected]);
-
-  const open = useCallback((p: string | null) => {
-    location.hash = p ? `#/app/${encodeURIComponent(p)}` : "#/";
-  }, []);
 
   const rescan = useCallback(async () => {
     if (!selected) return;
@@ -90,30 +125,45 @@ export function App() {
     }
   }, [selected]);
 
+  const shownApps = useMemo(() => apps.filter((a) => settings?.includeSystem !== false || a.location !== "system"), [apps, settings]);
   const visible = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    return f ? apps.filter((a) => a.name.toLowerCase().includes(f) || quick[a.path]?.stackLabel.toLowerCase().includes(f)) : apps;
-  }, [apps, filter, quick]);
+    return f ? shownApps.filter((a) => a.name.toLowerCase().includes(f) || quick[a.path]?.stackLabel.toLowerCase().includes(f)) : shownApps;
+  }, [shownApps, filter, quick]);
 
+  const readCount = shownApps.filter((a) => quick[a.path]).length;
   const selectedName = apps.find((a) => a.path === selected)?.name;
+
+  const nav: { to: string; page: Route["page"]; label: string; icon: LucideIcon; meta?: string }[] = [
+    { to: "#/", page: "overview", label: "Your Mac", icon: LayoutGrid, meta: shownApps.length ? `${readCount === shownApps.length ? shownApps.length : `${readCount}/${shownApps.length}`} apps` : undefined },
+    { to: "#/changes", page: "changes", label: "Changes", icon: History, meta: badges.changes ? String(badges.changes) : undefined },
+    { to: "#/live", page: "live", label: "Live", icon: Activity, meta: badges.live !== undefined ? `${badges.live} online` : undefined },
+    { to: "#/cleanup", page: "cleanup", label: "Clean up", icon: Sparkles, meta: badges.reclaim ? bytes(badges.reclaim) : undefined },
+  ];
 
   return (
     <div className="shell">
       <aside className="rail">
-        <div className="wordmark">
-          <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden>
-            <circle cx="16" cy="16" r="11" fill="none" stroke="#7FD3FF" strokeWidth="3" strokeDasharray="40 12" />
-            <circle cx="16" cy="16" r="4" fill="#E6F1FF" />
-          </svg>
+        <a className="wordmark" href="#/" aria-label="Teardown home">
+          <img src="/logo.svg" width={26} height={26} alt="" />
           Teardown
-        </div>
+        </a>
+
+        <nav className="primary-nav" aria-label="Pages">
+          {nav.map((n) => (
+            <a key={n.page} href={n.to} className={`nav-item${route.page === n.page ? " active" : ""}`} aria-current={route.page === n.page ? "page" : undefined}>
+              <n.icon size={17} aria-hidden />
+              <span className="nav-label">{n.label}</span>
+              {n.meta && <span className="nav-meta">{n.meta}</span>}
+            </a>
+          ))}
+        </nav>
+
         <label className="search">
           <Search size={15} aria-hidden />
           <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find an app or stack" aria-label="Find an app" />
         </label>
-        <button className={`rail-item overview-item${!selected ? " active" : ""}`} onClick={() => open(null)}>
-          <LayoutGrid size={16} aria-hidden /> Your Mac
-        </button>
+
         <nav className="rail-list" aria-label="Installed apps">
           {SECTIONS.map(([loc, label]) => {
             const list = visible.filter((a) => a.location === loc);
@@ -122,34 +172,52 @@ export function App() {
               <section key={loc}>
                 <h2 className="rail-heading">{label}</h2>
                 {list.map((a) => {
-                  const q = quick[a.path];
+                  const r = quick[a.path];
                   return (
-                    <button key={a.path} className={`rail-item${selected === a.path ? " active" : ""}`} onClick={() => open(a.path)}>
+                    <a key={a.path} href={`#/app/${encodeURIComponent(a.path)}`} className={`rail-item${selected === a.path ? " active" : ""}`}>
                       <img src={api.icon(a.path)} alt="" width={22} height={22} loading="lazy" />
                       <span className="rail-name">{a.name}</span>
-                      {q && <span className="dot" style={{ background: STACK_COLOR[q.stack] }} title={q.stackLabel} />}
-                    </button>
+                      {r && <span className="dot" style={{ background: STACK_COLOR[r.stack] }} title={r.stackLabel} />}
+                    </a>
                   );
                 })}
               </section>
             );
           })}
         </nav>
+
+        <a href="#/settings" className={`nav-item settings-item${route.page === "settings" ? " active" : ""}`} aria-current={route.page === "settings" ? "page" : undefined}>
+          <SettingsIcon size={17} aria-hidden />
+          <span className="nav-label">Settings</span>
+        </a>
       </aside>
 
       <main className="stage">
-        {!selected && <Overview apps={apps} quick={quick} onOpen={open} />}
-        {selected && loading && !report && <Scanning name={selectedName ?? "app"} />}
-        {selected && error && (
-          <div className="empty">
-            <p>{error}</p>
-            <button className="ghost" onClick={() => open(null)}>Back to your Mac</button>
-          </div>
+        {route.page === "overview" && <Overview apps={shownApps} quick={quick} onOpen={openApp} reclaim={badges.reclaim} />}
+        {route.page === "changes" && <Changes onOpen={openApp} />}
+        {route.page === "live" && <Live onOpen={openApp} />}
+        {route.page === "cleanup" && (
+          <Cleanup
+            scan={cleanupScan}
+            onScan={(s) => {
+              setCleanupScan(s);
+              setBadges((b) => ({ ...b, reclaim: s.items.filter((i) => i.removable).reduce((a, i) => a + i.bytes, 0) }));
+            }}
+          />
         )}
-        {selected && report && report.path === selected && !error && (
-          <Teardown report={report} onRescan={rescan} rescanning={rescanning} />
+        {route.page === "settings" && <SettingsPage settings={settings} onChange={setSettings} />}
+        {route.page === "app" && (
+          <>
+            {loading && (!report || report.path !== selected) && <Scanning name={selectedName ?? "app"} />}
+            {error && (
+              <div className="empty">
+                <p>{error}</p>
+                <a className="btn btn-ghost" href="#/">Back to your Mac</a>
+              </div>
+            )}
+            {report && report.path === selected && !error && <Teardown report={report} onRescan={rescan} rescanning={rescanning} />}
+          </>
         )}
-        {selected && loading && report && report.path !== selected && <Scanning name={selectedName ?? "app"} />}
       </main>
     </div>
   );

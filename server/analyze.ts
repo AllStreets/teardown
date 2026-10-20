@@ -13,6 +13,7 @@ import { parsePlistXml, readPlist, run } from "./run.js";
 
 interface Basics {
   app: string;
+  contents: string;
   name: string;
   info: Record<string, unknown>;
   exec?: string;
@@ -41,12 +42,23 @@ async function list(dir: string): Promise<string[]> {
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 
-async function basics(app: string): Promise<Basics> {
+// Mac apps keep everything in Contents/. iPhone and iPad apps running on a Mac are wrapped:
+// the real bundle sits in Wrapper/, with Info.plist and the executable at its root.
+export async function layout(app: string) {
   const contents = path.join(app, "Contents");
-  const info = (await readPlist(path.join(contents, "Info.plist"))) ?? {};
+  if (await exists(contents)) return { contents, execDir: path.join(contents, "MacOS"), info: path.join(contents, "Info.plist"), ios: false };
+  const inner = await fs.realpath(path.join(app, "WrappedBundle")).catch(() => undefined);
+  if (inner) return { contents: inner, execDir: inner, info: path.join(inner, "Info.plist"), ios: true };
+  return { contents, execDir: path.join(contents, "MacOS"), info: path.join(contents, "Info.plist"), ios: false };
+}
+
+async function basics(app: string): Promise<Basics> {
+  const lay = await layout(app);
+  const contents = lay.contents;
+  const info = (await readPlist(lay.info)) ?? {};
   const name = str(info.CFBundleDisplayName) ?? str(info.CFBundleName) ?? path.basename(app, ".app");
   const execName = str(info.CFBundleExecutable);
-  let exec = execName ? path.join(contents, "MacOS", execName) : undefined;
+  let exec = execName ? path.join(lay.execDir, execName) : undefined;
   if (exec && !(await exists(exec))) exec = undefined;
 
   const frameworks = await list(path.join(contents, "Frameworks"));
@@ -69,7 +81,7 @@ async function basics(app: string): Promise<Basics> {
   }
 
   return {
-    app, name, info, exec, frameworks, links,
+    app, contents, name, info, exec, frameworks, links,
     archs: [...new Set((archOut?.stdout.trim().split(/\s+/).filter(Boolean) ?? []).map((a) => (a === "arm64e" ? "arm64" : a)))],
     markers,
   };
@@ -84,17 +96,17 @@ interface StackResult {
   engineDir?: string;
 }
 
-async function findChromiumFramework(app: string, frameworks: string[]) {
+async function findChromiumFramework(contents: string, frameworks: string[]) {
   for (const f of frameworks) {
     if (!f.endsWith(".framework")) continue;
-    const res = path.join(app, "Contents", "Frameworks", f, "Versions", "Current", "Resources");
+    const res = path.join(contents, "Frameworks", f, "Versions", "Current", "Resources");
     if (await exists(path.join(res, "icudtl.dat")) || f.startsWith("Chromium Embedded Framework")) return f;
   }
   return undefined;
 }
 
 async function detectStack(b: Basics): Promise<StackResult> {
-  const c = path.join(b.app, "Contents");
+  const c = b.contents;
   const fw = (re: RegExp) => b.frameworks.find((f) => re.test(f));
   const link = (re: RegExp) => b.links.find((l) => re.test(l));
   const detections: Detection[] = [];
@@ -112,7 +124,7 @@ async function detectStack(b: Basics): Promise<StackResult> {
     candidates.push(add("electron", "Electron", [electronFw ? `Contents/Frameworks/${electronFw}` : "", asar ? "Contents/Resources/app.asar" : ""].filter(Boolean)));
     if (electronFw) engineDir = path.join(c, "Frameworks", electronFw);
   } else {
-    const chromium = await findChromiumFramework(b.app, b.frameworks);
+    const chromium = await findChromiumFramework(c, b.frameworks);
     if (chromium) {
       candidates.push(add("chromium", chromium.startsWith("Chromium Embedded") ? "Chromium Embedded Framework" : "Chromium", [`Contents/Frameworks/${chromium}`]));
       engineDir = path.join(c, "Frameworks", chromium);
@@ -152,13 +164,13 @@ async function detectStack(b: Basics): Promise<StackResult> {
   if (unity) candidates.push(add("game-engine", "Unity", [`found ${unity}`]));
   else if (godot) candidates.push(add("game-engine", "Godot", [`Contents/Resources/${godot}`]));
 
+  if (await exists(path.join(b.app, "Wrapper"))) candidates.push(add("ios", "iPhone or iPad app", ["Wrapper/ (wrapped iOS bundle)"]));
   const webkit = link(/WebKit\.framework/);
   if (webkit && (b.markers.has("rust") || b.markers.has("go")) && candidates.length === 0) {
     const rust = b.markers.has("rust");
     candidates.push(add("webview", rust ? "Web view with a Rust core" : "Web view with a Go core", [webkit, rust ? "Rust runtime symbols in main executable" : "Go build ID in main executable"], "Uses the system WebKit instead of shipping a browser"));
   }
 
-  if (await exists(path.join(b.app, "Wrapper"))) candidates.push(add("ios", "iPhone or iPad app", ["Wrapper/ (wrapped iOS bundle)"]));
   const catalyst = link(/iOSSupport|UIKit\.framework/);
   if (catalyst) candidates.push(add("catalyst", "Mac Catalyst", [catalyst]));
 
@@ -519,7 +531,7 @@ function sumKind(node: BundleNode, kind: NodeKind): number {
 export async function fullReport(app: string): Promise<Report> {
   const t0 = Date.now();
   const b = await basics(app);
-  const contents = path.join(app, "Contents");
+  const contents = b.contents;
   const w: Walk = { helpers: [], localizations: new Set(), files: 0 };
 
   const [s, ents, signing, rawTree] = await Promise.all([
