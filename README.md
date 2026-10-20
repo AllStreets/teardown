@@ -26,7 +26,7 @@ Teardown opens them up. It reads every installed app the way a reverse engineer 
   <img src="docs/demo.gif" alt="Teardown reading the Claude desktop app, exploring its bundle map, then opening Clean up" width="900" />
 </p>
 
-On the Mac in these screenshots, Teardown found that **20 of 74 apps are web pages in a wrapper**, carrying **21 separate copies of Chromium** (8.4 GB of them), and that **57 GB** could be freed without losing anything that matters.
+On the Mac in these screenshots, Teardown found that **20 of 74 apps are web pages in a wrapper**, carrying **21 separate copies of Chromium** (8.4 GB of them), and that **56 GB** could be freed without losing anything that matters.
 
 <br />
 
