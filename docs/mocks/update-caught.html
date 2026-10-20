@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mock: update caught</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Hanken+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --film: #07111c; --plate: #0d1b2a; --line: #1c3149; --bone: #e6f1ff; --bone-2: #b5c6da;
+    --muted: #6c8299; --phosphor: #7fd3ff; --amber: #ffb547; --good: #6fe0b4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--film); color: var(--bone); font: 400 15px/1.55 "Hanken Grotesk", system-ui, sans-serif; overflow: hidden; }
+  .mock-tag { position: fixed; left: 16px; bottom: 14px; z-index: 50; font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .2em; color: var(--muted); }
+  .replay { position: fixed; right: 16px; bottom: 12px; z-index: 50; border: 1px solid var(--line); background: var(--plate); color: var(--bone-2); border-radius: 9px; height: 32px; padding: 0 12px; font: 500 13px "Hanken Grotesk"; cursor: pointer; }
+
+  .shell { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
+  .rail { border-right: 1px solid #142538; padding: 22px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .word { display: flex; gap: 10px; align-items: center; font: 650 20px "Bricolage Grotesque"; padding: 0 8px 14px; }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 10px; border-radius: 10px; color: var(--bone-2); font-weight: 550; font-size: 14px; }
+  .nav.active { background: linear-gradient(90deg,#7fd3ff1c,#7fd3ff05 70%); box-shadow: inset 0 0 0 1px #7fd3ff26; color: var(--bone); }
+  .nav small { color: var(--muted); font-weight: 500; }
+  .nav .badge { color: var(--film); background: var(--amber); border-radius: 9px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; opacity: 0; transform: scale(.6); transition: all .4s cubic-bezier(.2,1.4,.4,1); }
+  .nav .badge.on { opacity: 1; transform: none; box-shadow: 0 0 14px #ffb54788; }
+
+  .stage { position: relative; overflow: hidden; }
+  .scene { position: absolute; inset: 0; padding: 40px 52px; transition: opacity .6s ease, transform .6s ease; }
+  .quiet { opacity: 1; }
+  .quiet.gone { opacity: 0; transform: translateY(-14px); pointer-events: none; }
+  .edge { font: 500 10.5px/1 "JetBrains Mono"; letter-spacing: .28em; color: var(--phosphor); opacity: .5; white-space: pre; margin-bottom: 14px; }
+  h1 { margin: 0; font: 650 44px/1.05 "Bricolage Grotesque"; letter-spacing: -.025em; }
+  .lede { color: var(--bone-2); font-size: 17px; max-width: 60ch; margin-top: 10px; }
+  .watch { margin-top: 26px; display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid #142538; border-bottom: 1px solid #142538; color: var(--bone-2); }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 #6fe0b477 } 80%,100% { box-shadow: 0 0 0 9px #6fe0b400 } }
+
+  /* Toast: the update arriving. */
+  .toast { position: absolute; top: 22px; right: 26px; width: 380px; display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center;
+    padding: 14px 16px; border-radius: 14px; background: rgba(18,36,58,.95); border: 1px solid #ffb54755;
+    box-shadow: 0 24px 60px -10px #000a, 0 0 30px #ffb54722; transform: translateX(440px); transition: transform .6s cubic-bezier(.2,1,.3,1); z-index: 10; }
+  .toast.on { transform: none; }
+  .toast .ring { width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--amber) 0 30%, transparent 30%); -webkit-mask: radial-gradient(circle, transparent 54%, #000 55%); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  .toast b { display: block; font-weight: 650; }
+  .toast span { color: var(--muted); font-size: 13.5px; }
+
+  /* The diff scene. */
+  .diff { opacity: 0; transform: translateY(16px); pointer-events: none; }
+  .diff.on { opacity: 1; transform: none; pointer-events: auto; }
+  .head { display: flex; align-items: center; gap: 18px; }
+  .icon { width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg,#2fd1c6,#3a5bff); box-shadow: 0 8px 24px #3a8bff44; display: grid; place-items: center; font: 700 30px "Bricolage Grotesque"; color: #fff; }
+  .versions { font: 500 13px "JetBrains Mono"; color: var(--muted); margin-top: 6px; }
+  .versions em { font-style: normal; color: var(--amber); }
+  .grid { display: grid; grid-template-columns: 1fr 380px; gap: 36px; margin-top: 18px; align-items: center; }
+  .lightbox { position: relative; height: 560px; border-radius: 4px; background: radial-gradient(60% 90% at 50% 50%, #10263b 0%, #0a1726 55%, #060e17 100%); border: 1px solid #16304a; overflow: hidden; }
+  .lightbox svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ghost path { fill: none; stroke: #7fd3ff; stroke-opacity: .28; stroke-dasharray: 3 4; }
+  .tick { stroke: #7fd3ff; stroke-opacity: .25; }
+  .tick.long { stroke-opacity: .6; }
+  .callout { opacity: 0; transition: opacity .5s ease; }
+  .callout.on { opacity: 1; }
+  .callout line, .callout polyline { fill: none; stroke: var(--amber); stroke-width: 1.2; }
+  .callout .tag { font: 700 11px "JetBrains Mono"; letter-spacing: .18em; fill: var(--amber); }
+  .callout .name { font: 600 16px "Hanken Grotesk"; fill: var(--bone); }
+  .callout .meta { font: 400 12px "JetBrains Mono"; fill: var(--muted); }
+  .newpart { filter: drop-shadow(0 0 10px #ffb547); animation: throb 1.4s ease-in-out infinite; }
+  @keyframes throb { 50% { opacity: .55 } }
+
+  .verdict { font: 500 27px/1.25 "Bricolage Grotesque"; letter-spacing: -.01em; min-height: 140px; }
+  .verdict .hl { color: var(--amber); }
+  .changes { margin-top: 14px; display: flex; flex-direction: column; gap: 0; }
+  .chg { display: grid; grid-template-columns: 82px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid #142538; opacity: 0; transform: translateX(10px); transition: all .4s ease; font-size: 14.5px; }
+  .chg.on { opacity: 1; transform: none; }
+  .chg .k { font: 700 10.5px/1.9 "JetBrains Mono"; letter-spacing: .16em; color: var(--amber); }
+  .chg .k.ok { color: var(--muted); }
+  .chg p { margin: 0; color: var(--bone-2); }
+  .chg p b { color: var(--bone); font-weight: 600; }
+
+  .actions { position: absolute; left: 52px; right: 52px; bottom: 34px; display: flex; align-items: center; gap: 10px; padding: 14px 14px 14px 20px; border-radius: 16px;
+    background: rgba(18,36,58,.94); border: 1px solid #ffb54744; box-shadow: 0 24px 70px -10px #000c, 0 0 40px #ffb54718;
+    transform: translateY(140%); transition: transform .7s cubic-bezier(.2,1,.3,1); }
+  .actions.on { transform: none; }
+  .actions p { flex: 1; margin: 0; color: var(--bone-2); font-size: 14px; }
+  .actions p b { color: var(--bone); }
+  .btn { height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--plate); color: var(--bone-2); font: 600 14px "Hanken Grotesk"; cursor: pointer; white-space: nowrap; }
+  .btn.primary { background: var(--amber); border-color: var(--amber); color: #1a0f00; box-shadow: 0 0 22px #ffb54766; }
+  .done { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(7,17,28,.86); opacity: 0; pointer-events: none; transition: opacity .5s; z-index: 20; text-align: center; }
+  .done.on { opacity: 1; pointer-events: auto; }
+  .done h2 { font: 650 34px "Bricolage Grotesque"; margin: 10px 0 6px; }
+  .done p { color: var(--bone-2); margin: 0; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="word"><svg width="24" height="24" viewBox="0 0 64 64" fill="none"><path d="M32 19.5A12.5 12.5 0 0 1 44.4 33.7M44.3 34.5A12.5 12.5 0 0 1 22 40.5M21.4 39.6A12.5 12.5 0 0 1 30.3 19.6" stroke="#7FD3FF" stroke-width="5"/><path d="M37.8 6.4A21.5 21.5 0 0 1 54 18" stroke="#E6F1FF" stroke-width="6.5"/><path d="M53.4 46A21.5 21.5 0 0 1 12 44" stroke="#4F7CFF" stroke-width="6.5"/><circle cx="32" cy="32" r="4.6" fill="#E6F1FF"/></svg>Teardown</div>
+    <div class="nav">Your Mac <small>139 apps</small></div>
+    <div class="nav active">Changes <span class="badge" id="badge">1</span></div>
+    <div class="nav">Live <small>5 online</small></div>
+    <div class="nav">Clean up <small>56 GB</small></div>
+  </aside>
+
+  <main class="stage">
+    <section class="scene quiet" id="quiet">
+      <div class="edge">TEARDOWN     CHANGES     139/139 RECORDED     0 UPDATES</div>
+      <h1>Changes</h1>
+      <p class="lede">Teardown keeps a snapshot of every app. When one updates, it compares the new version with the last one and shows what changed underneath.</p>
+      <div class="watch"><span class="pulse"></span>Watching. Every app recorded, checked a minute ago.</div>
+    </section>
+
+    <div class="toast" id="toast">
+      <div class="ring"></div>
+      <div><b>Driftwave updated itself</b><span>3.8.2 to 3.9.0. Reading the new version before you open it.</span></div>
+    </div>
+
+    <section class="scene diff" id="diff">
+      <div class="edge">TEARDOWN     DIFF     io.driftwave.app     3.8.2 &gt; 3.9.0     UPDATED 21:42     NOT YET OPENED</div>
+      <div class="head">
+        <div class="icon">D</div>
+        <div>
+          <h1>Driftwave</h1>
+          <div class="versions">3.8.2  <em>&gt;  3.9.0</em>   updated 3 minutes ago, while you were away</div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="lightbox"><svg id="plate" viewBox="-445 -270 890 540" aria-label="New version drawn over the outline of the old one, with new parts labelled"></svg></div>
+        <div>
+          <p class="verdict" id="verdict"></p>
+          <div class="changes">
+            <div class="chg" data-at="0"><span class="k">NEW</span><p><b>Sessionly</b> session recording SDK. It can capture what you do inside the app.</p></div>
+            <div class="chg" data-at="1"><span class="k">NEW</span><p>Asks for your <b>microphone</b>: "Driftwave uses your microphone to improve voice notes."</p></div>
+            <div class="chg" data-at="2"><span class="k">CHANGED</span><p>Signed by a <b>different developer</b>. Team 8XK2L4 became Q7MP90.</p></div>
+            <div class="chg" data-at="3"><span class="k ok">ALSO</span><p>Electron 37 to 38, 12 npm packages updated, 18 MB bigger.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="actions" id="actions">
+        <p><b>3.8.2 is still here.</b> Teardown kept a copy-on-write clone of it, so rolling back takes a second.</p>
+        <button class="btn">Keep 3.9.0 and keep watching</button>
+        <button class="btn">Open the evidence</button>
+        <button class="btn primary" id="rollback">Roll back to 3.8.2</button>
+      </div>
+      <div class="done" id="done">
+        <div>
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#6FE0B4" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>
+          <h2>Back on 3.8.2</h2>
+          <p>3.9.0 is in the Trash if you change your mind. Teardown will flag the next update too.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="mock-tag">MOCK SCENE     EXAMPLE DATA, NOT YOUR MAC</div>
+<button class="replay" id="replay">Replay</button>
+
+<script>
+const TAU = Math.PI * 2, R = 200, HOLE = 58, RINGS = 4, ring = (R - HOLE) / RINGS;
+const $ = (id) => document.getElementById(id);
+const svgNS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => { const n = document.createElementNS(svgNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); parent && parent.appendChild(n); return n; };
+const pt = (r, a) => [Math.sin(a) * r, -Math.cos(a) * r];
+function arc(r0, r1, a0, a1) {
+  const pad = 0.006; a0 += pad; a1 -= pad; if (a1 <= a0) return "";
+  const large = a1 - a0 > Math.PI ? 1 : 0;
+  const [x0, y0] = pt(r1, a0), [x1, y1] = pt(r1, a1), [x2, y2] = pt(r0, a1), [x3, y3] = pt(r0, a0);
+  return `M${x0} ${y0}A${r1} ${r1} 0 ${large} 1 ${x1} ${y1}L${x2} ${y2}A${r0} ${r0} 0 ${large} 0 ${x3} ${y3}Z`;
+}
+// Example bundle: [share of parent, color, children]. New parts are flagged.
+const OLD = { c: [[.70, "#4F7CFF", [[.8, "#4F7CFF", [[.75, "#4F7CFF"], [.25, "#3d66d9"]]], [.2, "#8EA2FF"]]], [.22, "#58E1C1", [[.7, "#58E1C1"], [.3, "#3fb79c"]]], [.08, "#3E7397"]] };
+const NEW = { c: [[.68, "#4F7CFF", [[.78, "#4F7CFF", [[.75, "#4F7CFF"], [.25, "#3d66d9"]]], [.15, "#8EA2FF"], [.07, "#FFB547", null, "sdk"]]], [.24, "#58E1C1", [[.66, "#58E1C1"], [.24, "#3fb79c"], [.10, "#FFB547", null, "mic"]]], [.08, "#3E7397"]] };
+
+function draw(tree, group, cls, until, out) {
+  (function walk(node, depth, a0, a1) {
+    let a = a0;
+    for (const [share, color, kids, flag] of node.c || []) {
+      const b = a + (a1 - a0) * share;
+      const r0 = HOLE + depth * ring + 1, r1 = HOLE + (depth + 1) * ring - 1;
+      if (until > a) {
+        const p = el("path", { d: arc(r0, r1, a, Math.min(b, until)), fill: cls ? "none" : color, "fill-opacity": .9 }, group);
+        if (flag && out) { p.classList.add("newpart"); out[flag] = { a: (a + b) / 2, r: r1 }; }
+      }
+      if (kids) walk({ c: kids }, depth + 1, a, b);
+      a = b;
+    }
+  })(tree, 0, 0, TAU);
+}
+
+let timers = [];
+const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+function run() {
+  timers.forEach(clearTimeout); timers = [];
+  ["toast", "diff", "actions", "done"].forEach((i) => $(i).classList.remove("on"));
+  $("quiet").classList.remove("gone"); $("badge").classList.remove("on");
+  document.querySelectorAll(".chg").forEach((c) => c.classList.remove("on"));
+  $("verdict").textContent = "";
+  const plate = $("plate"); plate.innerHTML = "";
+
+  // Scale ring and the dashed ghost of the version you had.
+  const scale = el("g", {}, plate);
+  for (let i = 0; i < 100; i++) { const a = i / 100 * TAU, long = i % 25 === 0; const [x0, y0] = pt(R + 9, a), [x1, y1] = pt(R + (long ? 22 : 14), a); el("line", { x1: x0, y1: y0, x2: x1, y2: y1, class: long ? "tick long" : "tick" }, scale); }
+  const ghost = el("g", { class: "ghost" }, plate);
+  draw(OLD, ghost, "ghost", TAU);
+  const live = el("g", {}, plate);
+  el("circle", { r: HOLE - 6, fill: "#07111c", stroke: "#1c3149" }, plate);
+  const hub = el("text", { y: 6, "text-anchor": "middle", fill: "#e6f1ff", style: "font:600 20px Bricolage Grotesque" }, plate); hub.textContent = "3.9.0";
+
+  at(900, () => { $("toast").classList.add("on"); $("badge").classList.add("on"); });
+  at(2600, () => { $("toast").classList.remove("on"); $("quiet").classList.add("gone"); $("diff").classList.add("on"); });
+
+  // The new version sweeps in over the ghost of the old one.
+  const parts = {};
+  at(3000, () => {
+    const start = performance.now();
+    (function frame(t) {
+      const k = Math.min(1, (t - start) / 1600), e = 1 - Math.pow(1 - k, 3);
+      live.innerHTML = ""; draw(NEW, live, null, e * TAU, parts);
+      if (k < 1) requestAnimationFrame(frame); else callouts();
+    })(start);
+  });
+
+  function callouts() {
+    const defs = [
+      { key: "sdk", tag: "NEW", name: "Sessionly.framework", meta: "session recording   6.1 MB" },
+      { key: "mic", tag: "NEW", name: "Microphone request", meta: "new privacy prompt" },
+    ];
+    defs.forEach((d, i) => at(i * 500, () => {
+      const p = parts[d.key]; if (!p) return;
+      // Labels go on the side their part is on, at its height, so leaders never cross.
+      d.side = Math.sin(p.a) >= 0 ? 1 : -1;
+      d.y = Math.max(-200, Math.min(200, -Math.cos(p.a) * (R + 40)));
+      const [ax, ay] = pt(p.r, p.a), [ex, ey] = pt(R + 6, p.a);
+      const x = d.side * 250, g = el("g", { class: "callout" }, plate);
+      el("polyline", { points: `${ax},${ay} ${ex},${ey} ${d.side * 232},${d.y} ${x - d.side * 8},${d.y}` }, g);
+      el("circle", { cx: ax, cy: ay, r: 3.5, fill: "#FFB547" }, g);
+      const anchor = d.side > 0 ? "start" : "end";
+      el("text", { x, y: d.y - 24, "text-anchor": anchor, class: "tag" }, g).textContent = d.tag;
+      el("text", { x, y: d.y - 4, "text-anchor": anchor, class: "name" }, g).textContent = d.name;
+      el("text", { x, y: d.y + 14, "text-anchor": anchor, class: "meta" }, g).textContent = d.meta;
+      requestAnimationFrame(() => g.classList.add("on"));
+    }));
+    const signer = el("g", { class: "callout" }, plate);
+    el("text", { x: 0, y: 252, "text-anchor": "middle", class: "tag" }, signer).textContent = "SIGNED BY A DIFFERENT DEVELOPER   8XK2L4 > Q7MP90";
+    at(1100, () => signer.classList.add("on"));
+    at(1300, verdict);
+  }
+
+  function verdict() {
+    const html = 'Driftwave 3.9.0 <span class="hl">started recording sessions</span>, now <span class="hl">asks for your microphone</span>, and is <span class="hl">signed by someone new</span>.';
+    const plain = html.replace(/<[^>]+>/g, "");
+    let i = 0;
+    (function type() {
+      i += 2;
+      // Reveal the plain text, then swap in the highlighted version at the end.
+      $("verdict").textContent = plain.slice(0, i);
+      if (i < plain.length) at(18, type); else $("verdict").innerHTML = html;
+    })();
+    document.querySelectorAll(".chg").forEach((c) => at(900 + c.dataset.at * 260, () => c.classList.add("on")));
+    at(2300, () => $("actions").classList.add("on"));
+  }
+}
+
+$("rollback").onclick = () => $("done").classList.add("on");
+$("replay").onclick = run;
+run();
+</script>
+</body>
+</html>

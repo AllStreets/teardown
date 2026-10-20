@@ -160,6 +160,9 @@ export interface Settings {
   staleDays: number;
   // Apps Teardown leaves out of every page, by bundle path.
   hiddenApps: string[];
+  keepVersions: boolean;
+  notifyUpdates: "notable" | "all" | "off";
+  notifyArrivals: boolean;
 }
 
 export interface StorageInfo {
@@ -207,6 +210,7 @@ export interface Fingerprint {
   frameworks: { name: string; size: number }[];
   npm: { name: string; version?: string }[];
   domains: string[];
+  tree?: BundleNode;
 }
 
 export interface Change {
@@ -290,4 +294,60 @@ export interface TrashResult {
   ok: boolean;
   error?: string;
   bytes: number;
+}
+
+// ---------- versions and rollback ----------
+
+export interface SavedVersion {
+  version?: string;
+  savedAt: number;
+  path: string;
+  current: boolean;
+}
+
+// ---------- notifications ----------
+
+export interface Notice {
+  id: number;
+  kind: "update" | "arrival" | "rollback";
+  title: string;
+  body: string;
+  target: string;
+  severity: Severity;
+  at: number;
+}
+
+// ---------- apps not opened yet ----------
+
+export interface Arrival {
+  path: string;
+  name: string;
+  bundleId?: string;
+  version?: string;
+  source?: string;
+  from?: string[];
+  quarantinedAt?: number;
+  stack?: Stack;
+  stackLabel?: string;
+  findings: Finding[];
+  verdict?: string;
+}
+
+// ---------- permissions you've granted ----------
+
+export interface Grant {
+  service: string;
+  label: string;
+  client: string;
+  app?: { name: string; path: string };
+  allowed: boolean;
+  since?: number;
+  scope: "user" | "system";
+  lastUsed?: number;
+}
+
+export interface GrantsReport {
+  readable: boolean;
+  reason?: string;
+  grants: Grant[];
 }

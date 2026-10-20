@@ -25,6 +25,9 @@ export const DEFAULT_SETTINGS: Settings = {
   includeSystem: true,
   staleDays: 180,
   hiddenApps: [],
+  keepVersions: true,
+  notifyUpdates: "notable",
+  notifyArrivals: true,
 };
 
 let current: Settings | undefined;
@@ -44,6 +47,9 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
     hiddenApps: Array.isArray(patch.hiddenApps)
       ? [...new Set(patch.hiddenApps.filter((p): p is string => typeof p === "string" && p.endsWith(".app")))].sort()
       : s.hiddenApps,
+    keepVersions: typeof patch.keepVersions === "boolean" ? patch.keepVersions : s.keepVersions,
+    notifyUpdates: patch.notifyUpdates && ["notable", "all", "off"].includes(patch.notifyUpdates) ? patch.notifyUpdates : s.notifyUpdates,
+    notifyArrivals: typeof patch.notifyArrivals === "boolean" ? patch.notifyArrivals : s.notifyArrivals,
   };
   current = next;
   await writeJson(SETTINGS_FILE, next);

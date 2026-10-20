@@ -6,9 +6,11 @@ import { cacheKey, findApps, getFull, stamp } from "./apps.js";
 import { TRACKING } from "./knowledge.js";
 import { CHANGES_FILE, SNAPSHOT_DIR } from "./paths.js";
 import { getSettings, readJson, writeJson } from "./store.js";
+import { notify } from "./notices.js";
+import { saveVersion } from "./versions.js";
 
 // Bump whenever analysis changes in a way that would alter a snapshot of an unchanged app.
-export const ENGINE = 2;
+export const ENGINE = 3;
 
 export function fingerprint(r: Report, s: number): Fingerprint {
   return {
@@ -36,6 +38,7 @@ export function fingerprint(r: Report, s: number): Fingerprint {
     frameworks: r.frameworks.map((f) => ({ name: f.name, size: f.size })),
     npm: r.npm?.packages.map((p) => ({ name: p.name, version: p.version })) ?? [],
     domains: r.domains.map((d) => d.host),
+    tree: r.tree,
   };
 }
 
@@ -167,6 +170,7 @@ export async function observe(report: Report) {
   if (prev && prev.stamp === s && prev.engine === ENGINE) return;
   const fp = fingerprint(report, s);
   await saveSnapshot(fp);
+  await saveVersion(report.path, report.version, s).catch(() => {});
   // A first snapshot, or one taken by an older engine, becomes the new baseline silently.
   if (!prev || prev.engine !== ENGINE) return;
   const changes = diff(prev, fp);
@@ -181,6 +185,18 @@ export async function observe(report: Report) {
     detectedAt: fp.takenAt,
     changes: changes.length ? changes : [{ severity: "info", title: "Nothing changed underneath", detail: "The version number moved, but the bundle looks the same." }],
   });
+  const settings = await getSettings();
+  const notable = changes.filter((c) => c.severity === "notable");
+  if (settings.notifyUpdates === "all" || (settings.notifyUpdates === "notable" && notable.length)) {
+    const all = await readChanges();
+    await notify({
+      kind: "update",
+      title: `${fp.name} updated${fp.version ? ` to ${fp.version}` : ""}`,
+      body: notable.length ? notable.slice(0, 2).map((c) => c.title).join(". ") + "." : "Nothing risky changed underneath.",
+      target: `#/change/${all[0]?.id ?? ""}`,
+      severity: notable.length ? "notable" : "info",
+    });
+  }
 }
 
 // ---------- the watcher ----------

@@ -7,6 +7,10 @@ import { layout } from "./analyze.js";
 import { cleanupLog, scanCleanup, trash } from "./cleanup.js";
 import { checkNow, observe, readChanges, snapshotsFor, startWatching, watchStatus } from "./history.js";
 import { liveConnections, selfConnections } from "./network.js";
+import { arrivals, openArrival, trashArrival, watchArrivals } from "./arrivals.js";
+import { noticesSince } from "./notices.js";
+import { readGrants, revoke } from "./permissions.js";
+import { listVersions, rollback } from "./versions.js";
 import { CHANGES_FILE, CLEANUP_LOG, DATA_DIR, DIST_DIR, ICON_DIR, PORT, REPORT_DIR, SNAPSHOT_DIR, VERSION } from "./paths.js";
 import { readPlist, run } from "./run.js";
 import { dirStats, getSettings, readJson, updateSettings } from "./store.js";
@@ -154,6 +158,49 @@ app.get("/api/icon", wrap(async (req, res) => {
   res.sendFile(out, { dotfiles: "allow" });
 }));
 
+app.get("/api/notifications", wrap(async (req, res) => {
+  res.json(await noticesSince(Number(req.query.since ?? 0)));
+}));
+
+app.get("/api/change", wrap(async (req, res) => {
+  const ev = (await readChanges()).find((e) => e.id === req.query.id);
+  if (!ev) return res.status(404).json({ error: "That change isn't recorded." });
+  const snaps = await snapshotsFor(ev.path);
+  const i = snaps.findIndex((x) => x.takenAt === ev.detectedAt);
+  res.json({ event: ev, before: i > 0 ? snaps[i - 1] : undefined, after: snaps[i], versions: await listVersions(ev.path) });
+}));
+
+app.get("/api/versions", wrap(async (req, res) => {
+  const p = await validApp(req.query.path);
+  if (!p) return res.status(400).json({ error: "That isn't an app bundle." });
+  res.json(await listVersions(p));
+}));
+
+app.post("/api/rollback", wrap(async (req, res) => {
+  const p = await validApp(req.body?.path);
+  if (!p) return res.status(400).json({ error: "That isn't an app bundle." });
+  res.json(await rollback(p, Number(req.body?.savedAt)));
+}));
+
+app.get("/api/arrivals", wrap(async (_req, res) => {
+  res.json(arrivals());
+}));
+app.post("/api/arrivals/open", wrap(async (req, res) => {
+  await openArrival(req.body?.path);
+  res.status(204).end();
+}));
+app.post("/api/arrivals/trash", wrap(async (req, res) => {
+  await trashArrival(req.body?.path);
+  res.status(204).end();
+}));
+
+app.get("/api/permissions", wrap(async (_req, res) => {
+  res.json(await readGrants());
+}));
+app.post("/api/permissions/revoke", wrap(async (req, res) => {
+  res.json(await revoke(String(req.body?.service ?? ""), String(req.body?.client ?? "")));
+}));
+
 app.use(express.static(DIST_DIR));
 app.get(/^\/(?!api\/).*/, (_req, res, next) => {
   res.sendFile(path.join(DIST_DIR, "index.html"), (err) => err && next());
@@ -162,4 +209,5 @@ app.get(/^\/(?!api\/).*/, (_req, res, next) => {
 app.listen(PORT, "127.0.0.1", () => {
   console.log(`Teardown engine on http://127.0.0.1:${PORT} (data in ${DATA_DIR})`);
   startWatching().catch(() => {});
+  watchArrivals();
 });

@@ -51,7 +51,7 @@ async function exists(p: string) {
   return fs.access(p).then(() => true, () => false);
 }
 
-async function runningApps(): Promise<Set<string>> {
+export async function runningApps(): Promise<Set<string>> {
   const r = await run("ps", ["-axww", "-o", "comm="], 5_000);
   const s = new Set<string>();
   for (const line of r.stdout.split("\n")) {
@@ -63,7 +63,7 @@ async function runningApps(): Promise<Set<string>> {
 
 // Spotlight's last-used date is often missing (migrated Macs, some installers), so fall back
 // to the newest write in the app's own data folders. No evidence at all means no verdict.
-async function lastUsed(app: string, bundleId?: string, name?: string): Promise<number | undefined> {
+export async function lastUsed(app: string, bundleId?: string, name?: string): Promise<number | undefined> {
   const r = await run("mdls", ["-raw", "-name", "kMDItemLastUsedDate", app], 5_000);
   const spotlight = Date.parse(r.stdout.trim().replace(" +0000", "Z").replace(" ", "T"));
   const places: string[] = [];
@@ -197,7 +197,7 @@ function safePath(p: string) {
 
 const appleString = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-async function moveToTrash(p: string) {
+export async function moveToTrash(p: string) {
   await fs.mkdir(TRASH, { recursive: true });
   let dest = path.join(TRASH, path.basename(p));
   if (await exists(dest)) {
