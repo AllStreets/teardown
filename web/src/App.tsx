@@ -185,7 +185,11 @@ export function App() {
                     <a key={a.path} href={`#/app/${encodeURIComponent(a.path)}`} className={`rail-item${selected === a.path ? " active" : ""}`}>
                       <img src={api.icon(a.path)} alt="" width={22} height={22} loading="lazy" />
                       <span className="rail-name">{a.name}</span>
-                      {r && <span className="dot" style={{ background: STACK_COLOR[r.stack] }} title={r.stackLabel} />}
+                      {r && (
+                        <span className="rail-bar" title={`${r.stackLabel}, ${bytes(r.sizeBytes)}`}>
+                          <span style={{ width: `${barWidth(r.sizeBytes)}%`, background: STACK_COLOR[r.stack] }} />
+                        </span>
+                      )}
                     </a>
                   );
                 })}
@@ -229,6 +233,12 @@ export function App() {
       </main>
     </div>
   );
+}
+
+// Log scale, so a 9 GB app and a 10 MB app both get a visible bar.
+function barWidth(size: number) {
+  const k = Math.max(0, Math.min(1, (Math.log10(Math.max(size, 1e6)) - 6) / 4));
+  return Math.round(10 + k * 90);
 }
 
 function Scanning({ name }: { name: string }) {

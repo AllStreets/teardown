@@ -44,10 +44,11 @@ export function Checkbox({ checked, onChange, label, indeterminate }: { checked:
   return <input ref={ref} type="checkbox" className="checkbox" aria-label={label} checked={checked} onChange={(e) => onChange(e.target.checked)} />;
 }
 
-export function PageHeader({ title, lede, actions }: { title: string; lede?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({ title, lede, actions, edge }: { title: string; lede?: ReactNode; actions?: ReactNode; edge?: (string | number | false | null | undefined)[] }) {
   return (
     <header className="page-head">
       <div>
+        {edge && <p className="edge-line" aria-hidden>{edge.filter(Boolean).join("     ")}</p>}
         <h1 className="page-title">{title}</h1>
         {lede && <p className="page-lede">{lede}</p>}
       </div>

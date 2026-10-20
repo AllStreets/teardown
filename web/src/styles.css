@@ -546,3 +546,76 @@ ul { margin: 0; padding: 0; list-style: none; }
 .hidden-empty { padding: 8px 0; font-size: 14px; }
 .hidden-list li { display: grid; grid-template-columns: 160px 1fr auto; align-items: center; gap: 14px; padding: 6px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
 .hidden-list code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+
+/* ---------- radiograph identity ---------- */
+
+.td-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 56px; align-items: start; margin: 34px 0 10px; }
+.td-top .verdict { margin: 0; }
+.td-top .findings h2 { margin-top: 6px; }
+.measure { color: var(--phosphor); text-decoration: underline dotted #7fd3ff66; text-underline-offset: 6px; text-decoration-thickness: 2px; }
+
+.specimen { margin: 34px -56px 0; }
+.specimen .crumbs { padding: 0 56px; }
+.lightbox {
+  position: relative;
+  padding: 18px 56px;
+  background:
+    radial-gradient(60% 90% at 50% 50%, #10263b 0%, #0a1726 55%, #060e17 100%);
+  border-top: 1px solid #16304a;
+  border-bottom: 1px solid #16304a;
+  overflow: hidden;
+}
+/* Film grain, so the plate reads as a material rather than a flat fill. */
+.lightbox::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.09; mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .6 0 0 0 0 .85 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* Edge print, the codes radiographs carry along their margin. */
+.edge-print {
+  position: absolute; left: 22px; top: 50%; margin: 0;
+  transform: translate(-50%, -50%) rotate(-90deg); transform-origin: center;
+  font: 500 10.5px/1 var(--mono); letter-spacing: 0.32em; color: #7fd3ff;
+  opacity: 0.38; white-space: pre; pointer-events: none;
+}
+.lightbox svg { display: block; width: 100%; max-width: 1080px; height: auto; margin: 0 auto; overflow: visible; }
+.lightbox .scale .tick { stroke: #7fd3ff; stroke-opacity: 0.22; stroke-width: 1; }
+.lightbox .scale .tick.long { stroke-opacity: 0.6; stroke-width: 1.4; }
+.lightbox .tick-label { font: 500 11px/1 var(--mono); fill: #7fd3ff; fill-opacity: 0.55; text-anchor: middle; }
+.callout .leader { fill: none; stroke: #e6f1ff; stroke-opacity: 0.38; stroke-width: 1; }
+.callout-dot { fill: #e6f1ff; }
+.callout-name { font: 600 14px/1 var(--body); fill: var(--bone); }
+.callout-size { font: 400 12px/1 var(--mono); fill: var(--muted); white-space: pre; }
+.callout:hover .leader, .callout.active .leader { stroke: var(--phosphor); stroke-opacity: 0.9; }
+.callout:hover .callout-name, .callout.active .callout-name { fill: var(--phosphor); }
+.callout:hover .callout-dot, .callout.active .callout-dot { fill: var(--phosphor); filter: drop-shadow(0 0 4px #7fd3ff); }
+.specimen .legend { padding: 0 56px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+/* Sidebar: a small meter per app showing its size, in its stack color. */
+.rail-bar { width: 34px; height: 3px; border-radius: 2px; background: #1c3149; overflow: hidden; flex: none; }
+.rail-bar span { display: block; height: 100%; border-radius: 2px; opacity: 0.8; }
+.rail-item:hover .rail-bar span, .rail-item.active .rail-bar span { opacity: 1; }
+
+@media (max-width: 1100px) {
+  .td-top { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+}
+@media (max-width: 760px) {
+  .specimen { margin: 24px -16px 0; }
+  .lightbox, .specimen .crumbs, .specimen .legend { padding-left: 16px; padding-right: 16px; }
+  .edge-print { display: none; }
+}
+
+/* Measured strips and edge print, shared by every page. */
+.plate-band {
+  position: relative; margin: 36px -56px 26px; padding: 22px 56px 12px;
+  background: radial-gradient(70% 120% at 50% 40%, #10263b 0%, #0a1726 60%, #07111c 100%);
+  border-top: 1px solid #16304a; border-bottom: 1px solid #16304a; overflow: hidden;
+}
+.plate-band::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.08; mix-blend-mode: screen; background-image: inherit; }
+.strip { display: block; width: 100%; height: auto; overflow: visible; }
+.strip .scale .tick { stroke: #7fd3ff; stroke-opacity: 0.25; }
+.strip .scale .tick.long { stroke-opacity: 0.6; }
+.strip .tick-label { font: 500 11px/1 var(--mono); fill: #7fd3ff; fill-opacity: 0.55; }
+.strip .leader { stroke: #e6f1ff; stroke-opacity: 0.35; }
+.edge-line { margin: 0 0 14px; font: 500 10.5px/1 var(--mono); letter-spacing: 0.28em; color: #7fd3ff; opacity: 0.5; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.page-head .edge-line { margin-bottom: 16px; }
+@media (max-width: 760px) { .plate-band { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; } }

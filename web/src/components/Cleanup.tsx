@@ -4,6 +4,7 @@ import type { CleanupCategory, CleanupItem, CleanupScan, TrashResult } from "../
 import { api } from "../api";
 import { bytes } from "../format";
 import { Button, Checkbox, Dialog, Empty, PageHeader } from "./ui";
+import { MeasuredStrip } from "./Measure";
 
 const GROUPS: { category: CleanupCategory; title: string; blurb: string }[] = [
   { category: "caches", title: "Caches that rebuild themselves", blurb: "Apps and developer tools recreate these as needed. The only cost is a slower first launch or build." },
@@ -11,6 +12,15 @@ const GROUPS: { category: CleanupCategory; title: string; blurb: string }[] = [
   { category: "leftovers", title: "Left behind by deleted apps", blurb: "Settings, caches and data for apps that are no longer installed." },
   { category: "broken-login-items", title: "Broken login items", blurb: "Startup entries that point at programs which no longer exist." },
 ];
+
+const SHORT: Record<string, string> = { caches: "Caches", "stale-apps": "Unused apps", leftovers: "Leftovers", "broken-login-items": "Login items" };
+
+const GROUP_COLOR: Record<string, string> = {
+  caches: "#58E1C1",
+  "stale-apps": "#4F7CFF",
+  leftovers: "#C08BFF",
+  "broken-login-items": "#FF8FD1",
+};
 
 export function Cleanup({ scan, onScan }: { scan: CleanupScan | null; onScan: (s: CleanupScan) => void }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -70,6 +80,7 @@ export function Cleanup({ scan, onScan }: { scan: CleanupScan | null; onScan: (s
     <article className="page cleanup">
       <PageHeader
         title="Clean up"
+        edge={["TEARDOWN", "CLEAN UP", scan && `${items.filter((i) => i.removable).length} ITEMS`, scan && bytes(total), scan && `SCANNED ${(scan.ms / 1000).toFixed(1)}S`]}
         lede="Space you can get back, found by checking what's on this Mac against the apps that are actually installed. Everything goes to the Trash, so you can put it back."
         actions={<Button icon={RotateCw} busy={scanning} onClick={rescan}>{scanning ? "Scanning" : "Scan again"}</Button>}
       />
@@ -102,6 +113,17 @@ export function Cleanup({ scan, onScan }: { scan: CleanupScan | null; onScan: (s
           <span className="cleanup-number">{bytes(total)}</span>
           <span className="muted">could be freed across {items.filter((i) => i.removable).length} items. Scanned in {(scan.ms / 1000).toFixed(1)} seconds.</span>
         </p>
+      )}
+
+      {scan && total > 0 && (
+        <div className="plate-band">
+          <MeasuredStrip
+            unit={bytes}
+            labelled={4}
+            segments={GROUPS.map((g) => ({ key: g.category, label: SHORT[g.category], value: items.filter((i) => i.category === g.category).reduce((a, i) => a + i.bytes, 0), color: GROUP_COLOR[g.category] }))
+              .filter((sg) => sg.value > 0)}
+          />
+        </div>
       )}
 
       {scan && items.length === 0 && (

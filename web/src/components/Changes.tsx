@@ -58,6 +58,7 @@ export function Changes({ onOpen }: { onOpen: (path: string) => void }) {
     <article className="page">
       <PageHeader
         title="Changes"
+        edge={["TEARDOWN", "CHANGES", status && `${status.baselined}/${status.total} RECORDED`, events && `${events.length} UPDATES`, new Date().toISOString().slice(0, 10)]}
         lede="Teardown keeps a snapshot of every app. When one updates, it compares the new version with the last one and shows what changed underneath, things release notes leave out."
         actions={<Button icon={RotateCw} busy={busy} onClick={() => api.checkNow().then(setStatus)}>{busy ? "Checking" : "Check now"}</Button>}
       />

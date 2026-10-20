@@ -6,6 +6,7 @@ import { api } from "../api";
 import { STACK_COLOR, STACK_NAME, bytes } from "../format";
 import { Specimen } from "./Specimen";
 import { Button } from "./ui";
+import { Measured } from "./Measure";
 
 const TABS = ["Built with", "Permissions", "Network", "Inside", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -50,33 +51,38 @@ export function Teardown({ report, onRescan, rescanning }: { report: Report; onR
         </div>
       </header>
 
-      <section className="verdict" aria-label="Summary">
-        <p className="verdict-lead">{lead}</p>
-        {rest.length > 0 && <p className="verdict-rest">{rest.join(" ")}</p>}
-      </section>
-
-      <div className="td-grid">
-        <Specimen tree={report.tree} total={report.sizeBytes} fileCount={report.fileCount} />
-        <section className="findings" aria-label="Findings">
-          <h2>What stands out</h2>
-          <ul>
-            {report.findings.map((f, i) => {
-              const Icon = SEVERITY_ICON[f.severity];
-              return (
-                <li key={i} className={`finding ${f.severity}`}>
-                  <Icon size={18} aria-hidden className="finding-icon" />
-                  <div>
-                    <p className="finding-title">{f.title}</p>
-                    <p className="finding-detail">{f.detail}</p>
-                    {f.evidence && <code className="evidence">{f.evidence}</code>}
-                  </div>
-                </li>
-              );
-            })}
-            {report.findings.length === 0 && <li className="finding info">Nothing unusual turned up.</li>}
-          </ul>
+      <div className="td-top">
+        <section className="verdict" aria-label="Summary">
+          <p className="verdict-lead"><Measured text={lead} /></p>
+          {rest.length > 0 && <p className="verdict-rest">{rest.join(" ")}</p>}
         </section>
+          <section className="findings" aria-label="Findings">
+            <h2>What stands out</h2>
+            <ul>
+              {report.findings.map((f, i) => {
+                const Icon = SEVERITY_ICON[f.severity];
+                return (
+                  <li key={i} className={`finding ${f.severity}`}>
+                    <Icon size={18} aria-hidden className="finding-icon" />
+                    <div>
+                      <p className="finding-title">{f.title}</p>
+                      <p className="finding-detail">{f.detail}</p>
+                      {f.evidence && <code className="evidence">{f.evidence}</code>}
+                    </div>
+                  </li>
+                );
+              })}
+              {report.findings.length === 0 && <li className="finding info">Nothing unusual turned up.</li>}
+            </ul>
+          </section>
       </div>
+
+      <Specimen
+        tree={report.tree}
+        total={report.sizeBytes}
+        fileCount={report.fileCount}
+        edge={["TEARDOWN", report.bundleId ?? report.name, report.version ? `v${report.version}` : "", report.archs.join(" "), `${report.fileCount.toLocaleString()} FILES`, bytes(report.sizeBytes), new Date().toISOString().slice(0, 10)].filter(Boolean)}
+      />
 
       <div className="tabs" role="tablist">
         {TABS.map((t) => (

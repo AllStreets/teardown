@@ -64,7 +64,7 @@ export function SettingsPage({ settings, onChange, apps }: { settings: Settings 
 
   return (
     <article className="page settings">
-      <PageHeader title="Settings" lede="How Teardown watches your apps, what it keeps on this Mac, and proof that nothing leaves it." />
+      <PageHeader edge={["TEARDOWN", "SETTINGS", self && `v${self.version}`, self && `ENGINE PID ${self.pid}`, self && `${self.outbound.length} OUTBOUND`]} title="Settings" lede="How Teardown watches your apps, what it keeps on this Mac, and proof that nothing leaves it." />
 
       <div className="settings-layout">
         <nav className="toc" aria-label="Settings sections">

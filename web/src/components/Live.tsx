@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import type { LiveSnapshot } from "../../../shared/types";
 import { api } from "../api";
 import { Button, Empty, PageHeader } from "./ui";
+import { MeasuredStrip } from "./Measure";
+
+const TRACE = ["#7FD3FF", "#4F7CFF", "#58E1C1", "#C08BFF", "#FF8FD1", "#8EA2FF", "#FFE29A", "#3E7397"];
 
 const PORTS: Record<number, string> = { 443: "HTTPS", 80: "HTTP", 5228: "Google push", 5223: "Apple push", 993: "Mail", 3478: "Calls", 19302: "Calls" };
 
@@ -30,6 +33,7 @@ export function Live({ onOpen }: { onOpen: (path: string) => void }) {
     <article className="page">
       <PageHeader
         title="Live"
+        edge={["TEARDOWN", "LIVE", `${online.length} ONLINE`, `${total} CONNECTIONS`, snap && new Date(snap.at).toLocaleTimeString("en-GB")]}
         lede="Apps talking to the internet right now, checked against the web addresses written into their code. Refreshes every few seconds."
         actions={<Button icon={paused ? Play : Pause} onClick={() => setPaused(!paused)}>{paused ? "Resume" : "Pause"}</Button>}
       />
@@ -40,6 +44,16 @@ export function Live({ onOpen }: { onOpen: (path: string) => void }) {
           {online.length === 0 ? "No apps are connected right now." : `${online.length} app${online.length === 1 ? " has" : "s have"} ${total} open connection${total === 1 ? "" : "s"}.`}
           <span className="muted"> Updated {new Date(snap.at).toLocaleTimeString()}</span>
         </p>
+      )}
+
+      {online.length > 0 && (
+        <div className="plate-band">
+          <MeasuredStrip
+            unit={(v) => `${v} open`}
+            labelled={5}
+            segments={online.map((a, i) => ({ key: a.path, label: a.name, value: a.connections.length, color: TRACE[i % TRACE.length] }))}
+          />
+        </div>
       )}
 
       {snap && online.length === 0 && listeners.length === 0 && (

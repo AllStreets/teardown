@@ -1,6 +1,7 @@
 import type { AppEntry, QuickReport, Stack } from "../../../shared/types";
 import { api } from "../api";
 import { STACK_COLOR, STACK_NAME, bytes } from "../format";
+import { EdgePrint, Measured, MeasuredStrip } from "./Measure";
 
 const WRAPPER_STACKS: Stack[] = ["electron", "webview"];
 
@@ -32,14 +33,17 @@ export function Overview({ apps, quick, onOpen, reclaim }: Props) {
   return (
     <article className="overview">
       <header className="ov-head">
-        <p className="ov-progress" aria-live="polite">
-          {done ? `${mine.length} apps read` : `Reading ${read.length} of ${mine.length} apps`}
-          {!done && <span className="ov-progress-bar"><span style={{ width: `${(read.length / Math.max(1, mine.length)) * 100}%` }} /></span>}
-        </p>
+        <EdgePrint items={["TEARDOWN", "YOUR MAC", `${read.length} APPS`, bytes(total), new Date().toISOString().slice(0, 10)]} />
+        {!done && (
+          <p className="ov-progress" aria-live="polite">
+            {`Reading ${read.length} of ${mine.length} apps`}
+            <span className="ov-progress-bar"><span style={{ width: `${(read.length / Math.max(1, mine.length)) * 100}%` }} /></span>
+          </p>
+        )}
         <h1 className="ov-headline">
           {read.length === 0
             ? "Looking inside every app you've installed."
-            : `${web.length} of your ${read.length} apps are web pages in a wrapper.`}
+            : <Measured text={`${web.length} of your ${read.length} apps are web pages in a wrapper.`} />}
         </h1>
         {engines.length > 0 && (
           <p className="ov-sub">
@@ -56,14 +60,12 @@ export function Overview({ apps, quick, onOpen, reclaim }: Props) {
 
       {read.length > 0 && (
         <section aria-label="Apps by how they're built">
-          <div className="stackbar" role="img" aria-label="Share of apps by stack">
-            {ordered.map(([stack, list]) => (
-              <span
-                key={stack}
-                style={{ flexGrow: list.length, background: STACK_COLOR[stack], boxShadow: `0 0 18px ${STACK_COLOR[stack]}55` }}
-                title={`${STACK_NAME[stack]}: ${list.length}`}
-              />
-            ))}
+          <div className="plate-band">
+            <MeasuredStrip
+              unit={(v) => `${v} app${v === 1 ? "" : "s"}`}
+              labelled={5}
+              segments={ordered.map(([stack, list]) => ({ key: stack, label: STACK_NAME[stack], value: list.length, color: STACK_COLOR[stack] }))}
+            />
           </div>
 
           <dl className="ov-stats">

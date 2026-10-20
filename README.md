@@ -32,7 +32,7 @@ On the Mac in these screenshots, Teardown found that **20 of 74 apps are web pag
 
 Pick an app and Teardown reads its bundle from the outside, without ever launching it. The first thing you see is a sentence, not a table: *Claude is a web app packaged with Electron 44.7.2, carrying its own copy of Chromium 152.*
 
-The ring map shows where every byte goes. Hover to see what a piece is, click to drill in. Next to it, a short list of what actually matters about this app: a permission that loosens macOS's protections, an analytics SDK, a missing notarization, a login item that starts on its own.
+The ring map shows where every byte goes, laid on a lightbox and labelled like an exploded-view diagram: leader lines run from the biggest parts out to their names, sizes and share of the app. Hover to see what any piece is, click to drill in, and the labels follow you down. Next to it, a short list of what actually matters about this app: a permission that loosens macOS's protections, an analytics SDK, a missing notarization, a login item that starts on its own.
 
 Below that, four tabs go as deep as you want:
 
