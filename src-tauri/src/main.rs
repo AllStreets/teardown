@@ -105,14 +105,21 @@ fn main() {
                 let exe = std::env::current_exe()?;
                 let dir = exe.parent().expect("app binary has a parent folder");
                 let dist = app.path().resource_dir()?.join("dist");
+                // Contents/MacOS/teardown -> the .app bundle, so the engine can set up launch at login.
+                let bundle = dir.parent().and_then(|c| c.parent()).map(|b| b.to_path_buf()).unwrap_or_default();
                 let child = Command::new(dir.join("teardown-engine"))
                     .env("TEARDOWN_PORT", PORT.to_string())
                     .env("TEARDOWN_DIST", dist)
+                    .env("TEARDOWN_APP", bundle)
                     .spawn()?;
                 *app.state::<Engine>().0.lock().unwrap() = Some(child);
             }
 
             let window = app.get_webview_window("main").expect("main window exists");
+            // Opened at login: start quietly in the menu bar.
+            if std::env::args().any(|a| a == "--hidden") {
+                let _ = window.hide();
+            }
             // Closing the window keeps Teardown watching from the menu bar.
             let w = window.clone();
             window.on_window_event(move |event| {

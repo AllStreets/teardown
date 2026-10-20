@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keepVersions: true,
   notifyUpdates: "notable",
   notifyArrivals: true,
+  launchAtLogin: false,
 };
 
 let current: Settings | undefined;
@@ -50,6 +51,7 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
     keepVersions: typeof patch.keepVersions === "boolean" ? patch.keepVersions : s.keepVersions,
     notifyUpdates: patch.notifyUpdates && ["notable", "all", "off"].includes(patch.notifyUpdates) ? patch.notifyUpdates : s.notifyUpdates,
     notifyArrivals: typeof patch.notifyArrivals === "boolean" ? patch.notifyArrivals : s.notifyArrivals,
+    launchAtLogin: typeof patch.launchAtLogin === "boolean" ? patch.launchAtLogin : s.launchAtLogin,
   };
   current = next;
   await writeJson(SETTINGS_FILE, next);

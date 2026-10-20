@@ -10,6 +10,7 @@ import { liveConnections, selfConnections } from "./network.js";
 import { arrivals, openArrival, trashArrival, watchArrivals } from "./arrivals.js";
 import { noticesSince } from "./notices.js";
 import { readGrants, revoke } from "./permissions.js";
+import { listStartup, setLaunchAtLogin, toggleStartup } from "./startup.js";
 import { listVersions, rollback, versionStorage } from "./versions.js";
 import { CHANGES_FILE, CLEANUP_LOG, DATA_DIR, DIST_DIR, ICON_DIR, PORT, REPORT_DIR, SNAPSHOT_DIR, VERSION } from "./paths.js";
 import { readPlist, run } from "./run.js";
@@ -97,7 +98,15 @@ app.get("/api/settings", wrap(async (_req, res) => {
 }));
 
 app.put("/api/settings", wrap(async (req, res) => {
+  const before = await getSettings();
   const next = await updateSettings(req.body ?? {});
+  if (next.launchAtLogin !== before.launchAtLogin) {
+    const r = await setLaunchAtLogin(next.launchAtLogin);
+    if (!r.ok) {
+      await updateSettings({ launchAtLogin: false });
+      return res.status(400).json({ error: r.note });
+    }
+  }
   await startWatching();
   res.json(next);
 }));
@@ -198,6 +207,13 @@ app.post("/api/arrivals/trash", wrap(async (req, res) => {
 app.post("/api/open-settings", wrap(async (_req, res) => {
   await run("open", ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"], 5_000);
   res.status(204).end();
+}));
+
+app.get("/api/startup", wrap(async (_req, res) => {
+  res.json(await listStartup());
+}));
+app.post("/api/startup/toggle", wrap(async (req, res) => {
+  res.json(await toggleStartup(req.body?.plist, req.body?.enable === true));
 }));
 
 app.get("/api/permissions", wrap(async (_req, res) => {

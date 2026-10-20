@@ -12,6 +12,8 @@ export const CLEANUP_LOG = path.join(DATA_DIR, "cleanup-log.json");
 export const VERSIONS_DIR = path.join(DATA_DIR, "versions");
 export const NOTICES_FILE = path.join(DATA_DIR, "notifications.json");
 export const ARRIVALS_FILE = path.join(DATA_DIR, "arrivals-seen.json");
+// Set by the Mac app so the engine can register it to launch at login.
+export const APP_BUNDLE = process.env.TEARDOWN_APP;
 
 
 export const DIST_DIR = process.env.TEARDOWN_DIST ?? path.resolve(process.cwd(), "dist");

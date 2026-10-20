@@ -1,5 +1,5 @@
 import type {
-  Arrival, ChangeEvent as CE, Fingerprint, GrantsReport, Notice, SavedVersion,
+  Arrival, StartupItem, ChangeEvent as CE, Fingerprint, GrantsReport, Notice, SavedVersion,
   AppEntry, ChangeEvent, CleanupScan, LiveSnapshot, QuickReport, Report, SelfConnections, Settings, StorageInfo, TrashResult, WatchStatus,
 } from "../../shared/types";
 
@@ -40,6 +40,8 @@ export const api = {
   trashArrival: (path: string) => post<void>("/api/arrivals/trash", { path }),
   permissions: () => call<GrantsReport>("/api/permissions"),
   revoke: (service: string, client: string) => post<{ ok: boolean; stillGranted: boolean; note?: string }>("/api/permissions/revoke", { service, client }),
+  startup: () => call<StartupItem[]>("/api/startup"),
+  toggleStartup: (plist: string, enable: boolean) => post<StartupItem>("/api/startup/toggle", { plist, enable }),
   openPrivacySettings: () => post<void>("/api/open-settings"),
   icon: (path: string) => `/api/icon?path=${q(path)}`,
   reveal: (path: string) => post<void>(`/api/reveal?path=${q(path)}`),

@@ -85,6 +85,9 @@ export function SettingsPage({ settings, onChange, apps }: { settings: Settings 
                     { value: 15, label: "15 minutes" }, { value: 30, label: "30 minutes" }, { value: 60, label: "Hour" }, { value: 360, label: "6 hours" }, { value: 1440, label: "Day" },
                   ]} />
                 </SettingRow>
+                <SettingRow label="Open Teardown when you log in" description="It starts quietly in the menu bar, so watching and notifications keep working after a restart.">
+                  <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => save({ launchAtLogin: v }).catch((e) => alert((e as Error).message))} />
+                </SettingRow>
                 <SettingRow label="Include apps that come with macOS" description="Apple's own apps, like Notes and Safari, in the sidebar and in watching.">
                   <Toggle label="Include macOS apps" checked={settings.includeSystem} onChange={(v) => save({ includeSystem: v })} />
                 </SettingRow>

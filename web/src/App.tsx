@@ -1,4 +1,4 @@
-import { Activity, History, KeyRound, LayoutGrid, Search, Settings as SettingsIcon, Sparkles, X, type LucideIcon } from "lucide-react";
+import { Activity, History, KeyRound, Power, LayoutGrid, Search, Settings as SettingsIcon, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AppEntry, CleanupScan, QuickReport, Report, Settings } from "../../shared/types";
 import { api } from "./api";
@@ -6,6 +6,7 @@ import { STACK_COLOR, bytes } from "./format";
 import { Changes } from "./components/Changes";
 import { ChangeView } from "./components/ChangeView";
 import { Permissions } from "./components/Permissions";
+import { Startup } from "./components/Startup";
 import type { Notice } from "../../shared/types";
 import { Cleanup } from "./components/Cleanup";
 import { Live } from "./components/Live";
@@ -20,6 +21,7 @@ type Route =
   | { page: "cleanup" }
   | { page: "settings" }
   | { page: "permissions" }
+  | { page: "startup" }
   | { page: "change"; id: string }
   | { page: "app"; path: string };
 
@@ -27,7 +29,7 @@ function parse(): Route {
   const h = location.hash.replace(/^#\/?/, "");
   if (h.startsWith("app/")) return { page: "app", path: decodeURIComponent(h.slice(4)) };
   if (h.startsWith("change/")) return { page: "change", id: decodeURIComponent(h.slice(7)) };
-  if (h === "changes" || h === "live" || h === "cleanup" || h === "settings" || h === "permissions") return { page: h };
+  if (h === "changes" || h === "live" || h === "cleanup" || h === "settings" || h === "permissions" || h === "startup") return { page: h };
   return { page: "overview" };
 }
 
@@ -153,6 +155,7 @@ export function App() {
     { to: "#/changes", page: "changes", label: "Changes", icon: History, meta: badges.changes ? String(badges.changes) : undefined },
     { to: "#/live", page: "live", label: "Live", icon: Activity, meta: badges.live !== undefined ? `${badges.live} online` : undefined },
     { to: "#/permissions", page: "permissions", label: "Permissions", icon: KeyRound },
+    { to: "#/startup", page: "startup", label: "Startup", icon: Power },
     { to: "#/cleanup", page: "cleanup", label: "Clean up", icon: Sparkles, meta: badges.reclaim ? bytes(badges.reclaim) : undefined },
   ];
 
@@ -216,6 +219,7 @@ export function App() {
         {route.page === "changes" && <Changes onOpen={openApp} />}
         {route.page === "change" && <ChangeView key={route.id} id={route.id} />}
         {route.page === "permissions" && <Permissions onOpen={openApp} />}
+        {route.page === "startup" && <Startup onOpen={openApp} />}
         {route.page === "live" && <Live onOpen={openApp} />}
         {route.page === "cleanup" && (
           <Cleanup

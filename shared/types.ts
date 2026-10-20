@@ -163,6 +163,7 @@ export interface Settings {
   keepVersions: boolean;
   notifyUpdates: "notable" | "all" | "off";
   notifyArrivals: boolean;
+  launchAtLogin: boolean;
 }
 
 export interface StorageInfo {
@@ -351,4 +352,19 @@ export interface GrantsReport {
   readable: boolean;
   reason?: string;
   grants: Grant[];
+}
+
+// ---------- startup items ----------
+
+export interface StartupItem {
+  label: string;
+  plist: string;
+  program?: string;
+  scope: "user" | "system-agent" | "system-daemon";
+  app?: { name: string; path: string };
+  loaded: boolean;
+  disabled: boolean;
+  missing: boolean;
+  runAtLoad: boolean;
+  keepAlive: boolean;
 }
