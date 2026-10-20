@@ -9,7 +9,7 @@ import { checkNow, observe, readChanges, snapshotsFor, startWatching, watchStatu
 import { liveConnections, selfConnections } from "./network.js";
 import { arrivals, openArrival, trashArrival, watchArrivals } from "./arrivals.js";
 import { noticesSince } from "./notices.js";
-import { readGrants, revoke } from "./permissions.js";
+import { diagnostics, readGrants, revoke } from "./permissions.js";
 import { listStartup, setLaunchAtLogin, toggleStartup } from "./startup.js";
 import { listVersions, rollback, versionStorage } from "./versions.js";
 import { CHANGES_FILE, CLEANUP_LOG, DATA_DIR, DIST_DIR, ICON_DIR, PORT, REPORT_DIR, SNAPSHOT_DIR, VERSION } from "./paths.js";
@@ -207,6 +207,11 @@ app.post("/api/arrivals/trash", wrap(async (req, res) => {
 app.post("/api/open-settings", wrap(async (_req, res) => {
   await run("open", ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"], 5_000);
   res.status(204).end();
+}));
+
+app.get("/api/diagnostics", wrap(async (_req, res) => {
+  await readGrants().catch(() => {});
+  res.json({ pid: process.pid, ppid: process.ppid, app: process.env.TEARDOWN_APP ?? null, permissions: diagnostics });
 }));
 
 app.get("/api/startup", wrap(async (_req, res) => {

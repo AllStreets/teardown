@@ -1,3 +1,4 @@
+import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Grant, GrantsReport } from "../shared/types.js";
@@ -55,6 +56,31 @@ interface Row {
   last_modified: number;
 }
 
+export const diagnostics: Record<string, string> = {};
+
+// Ask sqlite3 directly first. If macOS blocks that helper but allows the engine itself, copy the
+// database (and its write-ahead log) somewhere private and read the copy instead.
+async function query(db: string) {
+  const direct = await run("/usr/bin/sqlite3", ["-readonly", "-json", db, SQL], 8_000);
+  diagnostics[`${db} via sqlite3`] = direct.ok ? "ok" : direct.stderr.trim().split("\n")[0] || "failed";
+  if (direct.ok) return direct;
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "teardown-tcc-"));
+  try {
+    for (const ext of ["", "-wal", "-shm"]) {
+      await fs.copyFile(db + ext, path.join(dir, "TCC.db" + ext)).catch((e: NodeJS.ErrnoException) => {
+        if (ext === "") throw e;
+      });
+    }
+    diagnostics[`${db} via engine copy`] = "ok";
+    return await run("/usr/bin/sqlite3", ["-readonly", "-json", path.join(dir, "TCC.db"), SQL], 8_000);
+  } catch (e) {
+    diagnostics[`${db} via engine copy`] = (e as Error).message;
+    return direct;
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
 export async function readGrants(): Promise<GrantsReport> {
   const apps = await findApps();
   const quick = await pool(apps, 4, (a) => getQuick(a.path).catch(() => undefined));
@@ -71,7 +97,7 @@ export async function readGrants(): Promise<GrantsReport> {
   let readable = false;
   let reason: string | undefined;
   for (const [db, scope] of DBS) {
-    const r = await run("/usr/bin/sqlite3", ["-readonly", "-json", db, SQL], 8_000);
+    const r = await query(db);
     if (!r.ok) {
       const detail = r.stderr.trim().split("\n")[0];
       reason = /authorization denied|unable to open|not permitted/i.test(r.stderr)
