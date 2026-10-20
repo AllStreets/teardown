@@ -36,7 +36,14 @@ export const SERVICE_LABELS: Record<string, string> = {
   DeveloperTool: "Developer tool",
   FocusStatus: "Focus status",
   AudioCapture: "System audio recording",
+  Ubiquity: "iCloud",
+  UserTracking: "Tracking across apps and websites",
+  FileProviderDomain: "File provider access",
+  WebBrowserPublicKeyCredential: "Passkeys",
 };
+
+// Internal services macOS uses for its own plumbing; they mean nothing to a person.
+const INTERNAL = new Set(["Liverpool", "FileProviderPresence", "SystemPolicySysAdminFiles", "MSO", "Willow", "ShareKit"]);
 
 const SQL = "select service, client, client_type, auth_value, last_modified from access";
 
@@ -78,6 +85,7 @@ export async function readGrants(): Promise<GrantsReport> {
       const app = row.client_type === 0 ? byId.get(row.client) : byPath(row.client);
       if (!app) continue;
       const service = row.service.replace(/^kTCCService/, "");
+      if (INTERNAL.has(service)) continue;
       grants.push({
         service,
         label: SERVICE_LABELS[service] ?? service.replace(/([a-z])([A-Z])/g, "$1 $2"),

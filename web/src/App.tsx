@@ -1,9 +1,12 @@
-import { Activity, History, LayoutGrid, Search, Settings as SettingsIcon, Sparkles, type LucideIcon } from "lucide-react";
+import { Activity, History, KeyRound, LayoutGrid, Search, Settings as SettingsIcon, Sparkles, X, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AppEntry, CleanupScan, QuickReport, Report, Settings } from "../../shared/types";
 import { api } from "./api";
 import { STACK_COLOR, bytes } from "./format";
 import { Changes } from "./components/Changes";
+import { ChangeView } from "./components/ChangeView";
+import { Permissions } from "./components/Permissions";
+import type { Notice } from "../../shared/types";
 import { Cleanup } from "./components/Cleanup";
 import { Live } from "./components/Live";
 import { Overview } from "./components/Overview";
@@ -16,12 +19,15 @@ type Route =
   | { page: "live" }
   | { page: "cleanup" }
   | { page: "settings" }
+  | { page: "permissions" }
+  | { page: "change"; id: string }
   | { page: "app"; path: string };
 
 function parse(): Route {
   const h = location.hash.replace(/^#\/?/, "");
   if (h.startsWith("app/")) return { page: "app", path: decodeURIComponent(h.slice(4)) };
-  if (h === "changes" || h === "live" || h === "cleanup" || h === "settings") return { page: h };
+  if (h.startsWith("change/")) return { page: "change", id: decodeURIComponent(h.slice(7)) };
+  if (h === "changes" || h === "live" || h === "cleanup" || h === "settings" || h === "permissions") return { page: h };
   return { page: "overview" };
 }
 
@@ -146,6 +152,7 @@ export function App() {
     { to: "#/", page: "overview", label: "Your Mac", icon: LayoutGrid, meta: shownApps.length ? `${readCount === shownApps.length ? shownApps.length : `${readCount}/${shownApps.length}`} apps` : undefined },
     { to: "#/changes", page: "changes", label: "Changes", icon: History, meta: badges.changes ? String(badges.changes) : undefined },
     { to: "#/live", page: "live", label: "Live", icon: Activity, meta: badges.live !== undefined ? `${badges.live} online` : undefined },
+    { to: "#/permissions", page: "permissions", label: "Permissions", icon: KeyRound },
     { to: "#/cleanup", page: "cleanup", label: "Clean up", icon: Sparkles, meta: badges.reclaim ? bytes(badges.reclaim) : undefined },
   ];
 
@@ -207,6 +214,8 @@ export function App() {
       <main className="stage">
         {route.page === "overview" && <Overview apps={shownApps} quick={quick} onOpen={openApp} reclaim={badges.reclaim} />}
         {route.page === "changes" && <Changes onOpen={openApp} />}
+        {route.page === "change" && <ChangeView key={route.id} id={route.id} />}
+        {route.page === "permissions" && <Permissions onOpen={openApp} />}
         {route.page === "live" && <Live onOpen={openApp} />}
         {route.page === "cleanup" && (
           <Cleanup
@@ -231,6 +240,50 @@ export function App() {
           </>
         )}
       </main>
+      <Toasts />
+    </div>
+  );
+}
+
+// Alerts from the engine while the window is open. The Mac app also sends them as system notifications.
+function Toasts() {
+  const [list, setList] = useState<Notice[]>([]);
+  useEffect(() => {
+    let since = -1;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const fresh = await api.notices(Math.max(0, since));
+        if (since < 0) since = fresh.at(-1)?.id ?? 0;
+        else if (fresh.length && alive) {
+          since = fresh.at(-1)!.id;
+          setList((l) => [...l, ...fresh].slice(-3));
+          for (const n of fresh) setTimeout(() => setList((l) => l.filter((x) => x.id !== n.id)), 9_000);
+        }
+      } catch {}
+    };
+    poll();
+    const t = setInterval(poll, 5_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+  if (!list.length) return null;
+  return (
+    <div className="toasts" aria-live="polite">
+      {list.map((n) => (
+        <div key={n.id} className={`toast ${n.severity}`}>
+          <button className="toast-body" onClick={() => {
+            location.hash = n.target;
+            setList((l) => l.filter((x) => x.id !== n.id));
+          }}>
+            <strong>{n.title}</strong>
+            <span>{n.body}</span>
+          </button>
+          <button className="toast-close" aria-label="Dismiss" onClick={() => setList((l) => l.filter((x) => x.id !== n.id))}><X size={14} /></button>
+        </div>
+      ))}
     </div>
   );
 }

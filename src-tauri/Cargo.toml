@@ -1,6 +1,6 @@
 [package]
 name = "teardown"
-version = "0.2.0"
+version = "0.3.0"
 description = "X-ray the apps on your Mac"
 edition = "2021"
 
@@ -8,7 +8,10 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+ureq = "2"
+serde_json = "1"
+mac-notification-sys = "0.6"
 
 [profile.release]
 strip = true

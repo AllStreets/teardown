@@ -10,7 +10,7 @@ import { liveConnections, selfConnections } from "./network.js";
 import { arrivals, openArrival, trashArrival, watchArrivals } from "./arrivals.js";
 import { noticesSince } from "./notices.js";
 import { readGrants, revoke } from "./permissions.js";
-import { listVersions, rollback } from "./versions.js";
+import { listVersions, rollback, versionStorage } from "./versions.js";
 import { CHANGES_FILE, CLEANUP_LOG, DATA_DIR, DIST_DIR, ICON_DIR, PORT, REPORT_DIR, SNAPSHOT_DIR, VERSION } from "./paths.js";
 import { readPlist, run } from "./run.js";
 import { dirStats, getSettings, readJson, updateSettings } from "./store.js";
@@ -106,7 +106,7 @@ app.get("/api/storage", wrap(async (_req, res) => {
   const [reports, snapshots, icons, log] = await Promise.all([
     dirStats(REPORT_DIR), dirStats(SNAPSHOT_DIR), dirStats(ICON_DIR), readJson<unknown[]>(CLEANUP_LOG, []),
   ]);
-  const info: StorageInfo = { dataDir: DATA_DIR, reports, snapshots, icons, cleanupLog: log.length };
+  const info: StorageInfo = { dataDir: DATA_DIR, reports, snapshots, icons, cleanupLog: log.length, versions: await versionStorage() };
   res.json(info);
 }));
 
@@ -191,6 +191,12 @@ app.post("/api/arrivals/open", wrap(async (req, res) => {
 }));
 app.post("/api/arrivals/trash", wrap(async (req, res) => {
   await trashArrival(req.body?.path);
+  res.status(204).end();
+}));
+
+// Opens the Full Disk Access pane, so you can let Teardown read the permissions you've granted.
+app.post("/api/open-settings", wrap(async (_req, res) => {
+  await run("open", ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"], 5_000);
   res.status(204).end();
 }));
 

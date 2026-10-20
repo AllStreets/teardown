@@ -6,8 +6,11 @@
   <a href="#look-inside-any-app">Look inside</a>&nbsp;&nbsp;&nbsp;
   <a href="#your-whole-mac">Your Mac</a>&nbsp;&nbsp;&nbsp;
   <a href="#live">Live</a>&nbsp;&nbsp;&nbsp;
-  <a href="#changes">Changes</a>&nbsp;&nbsp;&nbsp;
+  <a href="#changes-and-rollback">Changes</a>&nbsp;&nbsp;&nbsp;
+  <a href="#before-you-open-it">New apps</a>&nbsp;&nbsp;&nbsp;
+  <a href="#permissions-youve-granted">Permissions</a>&nbsp;&nbsp;&nbsp;
   <a href="#clean-up">Clean up</a>&nbsp;&nbsp;&nbsp;
+  <a href="#for-ai-agents">For agents</a>&nbsp;&nbsp;&nbsp;
   <a href="#privacy">Privacy</a>&nbsp;&nbsp;&nbsp;
   <a href="#build-it-yourself">Build it</a>
 </p>
@@ -16,7 +19,7 @@
 
 Most of the apps on your Mac are black boxes. You can't tell which ones are a website in a costume, which ones quietly ship three analytics SDKs, which ones can control your other apps, or what changed when one updated itself last night.
 
-Teardown opens them up. It reads every installed app the way a reverse engineer would, then explains what it found in plain English, with the evidence beside every claim. It runs entirely on your Mac, with no account, no analytics and no server.
+Teardown opens them up. It reads every installed app the way a reverse engineer would, then explains what it found in plain English, with the evidence beside every claim. Then it lets you act: roll back an update that added a tracker, take back a permission an app hasn't used in a year, stop a download before its first launch, or clear out what deleted apps left behind. It runs entirely on your Mac, with no account, no analytics and no server.
 
 <p align="center">
   <img src="docs/demo.gif" alt="Teardown reading the Claude desktop app, exploring its bundle map, then opening Clean up" width="900" />
@@ -59,9 +62,12 @@ The home screen reads everything you've installed, filling in live as it goes, a
 
 Live shows which apps are talking to the internet right now. Teardown resolves the addresses written into each app's code and matches them against its open connections, so you can see at a glance which traffic the app announced and which it didn't. It refreshes every few seconds.
 
-## Changes
+## Changes and rollback
 
-Teardown keeps a snapshot of every app. When one updates, it compares the new version with the last and tells you what changed underneath:
+<img src="docs/screens/update-scene.png" alt="The update scene: the new version drawn over an outline of the old one, new parts labelled in amber, and a button to roll back" />
+<p align="center"><sub>Shown with example data. The first real update Teardown caught on this Mac was its own, 0.2.0 to 0.3.0.</sub></p>
+
+Teardown keeps a snapshot of every app. When one updates, it compares the new version with the last and shows what changed underneath: the new version is drawn over a dashed outline of the old one, and anything new glows amber with a label. It flags the changes that matter:
 
 - a new analytics or session-recording SDK
 - a new request for your camera, microphone, or location
@@ -70,6 +76,24 @@ Teardown keeps a snapshot of every app. When one updates, it compares the new ve
 - Electron and Chromium upgrades, new frameworks, new npm packages, new web addresses
 
 Release notes almost never mention any of that.
+
+Every update can be undone. When Teardown records an app it keeps an APFS clone of it, which shares every block with the installed app and costs nothing until the app changes (an 8.8 GB app cloned in 35 MB of metadata). Roll back and the saved version takes the app's place, while the newer one goes to the Trash.
+
+## Before you open it
+
+<img src="docs/screens/arrivals.png" alt="Apps that arrived but were never opened, each with a verdict and buttons to open or trash it" />
+
+macOS tags every downloaded app until it's opened once. Teardown watches for apps that arrived but never ran, reads them first, and tells you where they came from and what's inside. Open it, read the full teardown, or move it to the Trash before it does anything.
+
+## Permissions you've granted
+
+<img src="docs/screens/permissions.png" alt="Permissions page listing which apps can use the screen, microphone and camera, with buttons to take each back" />
+
+What an app *can* ask for is in its bundle. What you actually *said yes to* is in macOS's own permission records, and Teardown reads those too: screen recording, microphone, camera, input monitoring, Full Disk Access, automation, and the rest, with when each app was last active. Take any permission back with one click, or all the ones belonging to apps you haven't touched in six months. Teardown uses Apple's `tccutil`, so the app simply has to ask again. Reading the records needs Full Disk Access; changing nothing needs you to press a button.
+
+## Notifications and the menu bar
+
+Close the window and Teardown keeps watching from the menu bar. When an app updates with something notable, or a new app lands that you haven't opened, you get a macOS notification. Click it and Teardown opens on exactly that change.
 
 ## Clean up
 
@@ -84,11 +108,36 @@ Clean up compares what's on disk with what's actually installed and shows the sp
 
 Nothing is ever deleted. Teardown moves what you pick to the Trash, so anything can go straight back, and apps that are open are skipped.
 
+## For AI agents
+
+Teardown ships an MCP server, so an assistant like Claude can use it as a tool: "which of my apps can record my screen?", "what changed in the last Slack update?", "what's talking to the internet right now?". It can also take a permission back or roll an app back, but only when you've agreed.
+
+```sh
+npm run build:mcp
+claude mcp add teardown -- node "$(pwd)/build/teardown-mcp.mjs"
+```
+
+The server reads everything from the running Teardown engine, so open the app first. Tools: `list_apps`, `get_app`, `granted_permissions`, `recent_changes`, `live_connections`, `not_yet_opened`, `cleanup_summary`, `revoke_permission`, `rollback_app`.
+
+## Where the data comes from
+
+There is no AI inside Teardown. No model runs and nothing is generated. Every fact comes from reading files on your disk and running Apple's own command line tools, and the plain-English sentences are templates filled in with the measured values. You can check any of it yourself:
+
+| Teardown says | Where it comes from | Check it yourself |
+| --- | --- | --- |
+| Built with Electron 44 | `Electron Framework.framework` in the bundle, version from its `Info.plist` | `ls "/Applications/Claude.app/Contents/Frameworks"` |
+| Carries Chromium 152 | the `Chrome/…` version string inside that framework | `grep -a -o -m1 "Chrome/[0-9.]*" ".../Electron Framework"` |
+| Hardened runtime on, notarized | the code signature | `codesign -dv --verbose=4 /Applications/Slack.app` and `spctl -a -vv /Applications/Slack.app` |
+| Can ask for your microphone | `NSMicrophoneUsageDescription` in `Info.plist` | `plutil -p /Applications/Discord.app/Contents/Info.plist` |
+| You allowed its microphone | macOS's TCC permission database | `sqlite3 ~/Library/Application\ Support/com.apple.TCC/TCC.db "select * from access"` |
+| Talking to these servers now | open sockets | `lsof -i -n -P` |
+| Not opened yet | the `com.apple.quarantine` flag | `xattr -p com.apple.quarantine <app>` |
+
 ## Privacy
 
 <img src="docs/screens/settings.png" alt="Settings with the privacy policy, local data, and connection audit" />
 
-Teardown reads files and runs Apple's own command line tools: `codesign`, `spctl`, `otool`, `lipo`, `plutil`, `mdls` and `lsof`. It never launches or modifies the apps it inspects. Everything it keeps lives in `~/Library/Application Support/Teardown`, and Settings has buttons to clear it.
+Teardown reads files and runs Apple's own command line tools: `codesign`, `spctl`, `otool`, `lipo`, `plutil`, `mdls`, `lsof`, `xattr` and `tccutil`. It never launches or modifies the apps it inspects unless you press a button, and anything it removes goes to the Trash. Everything it keeps lives in `~/Library/Application Support/Teardown`, and Settings has buttons to clear it.
 
 It also audits itself. The Connections section runs Teardown's own engine against its own process and shows that it holds no connections to the internet. You can hide any app from Teardown entirely, and it will leave that app and its data alone on every page.
 
@@ -126,9 +175,13 @@ Then open http://127.0.0.1:4711. The first pass over every app takes about a min
 | `server/history.ts` | Snapshots each app and compares versions when it updates |
 | `server/network.ts` | Maps open sockets to apps and matches them against each app's code |
 | `server/cleanup.ts` | Finds reclaimable space and moves things to the Trash |
+| `server/versions.ts` | Keeps APFS clones of each app and rolls updates back |
+| `server/arrivals.ts` | Finds downloaded apps that have never been opened |
+| `server/permissions.ts` | Reads granted permissions and takes them back with `tccutil` |
+| `server/mcp.ts` | The MCP server for AI agents |
 | `server/knowledge.ts` | Known SDKs, entitlements and privacy keys |
 | `web/` | The React interface; the ring map is SVG laid out with `d3-hierarchy` |
-| `src-tauri/` | The Mac app: a small Rust shell that runs the engine beside it and shows the interface in the system WebKit |
+| `src-tauri/` | The Mac app: a small Rust shell that runs the engine beside it, shows the interface in the system WebKit, lives in the menu bar and sends notifications |
 
 The Mac app doesn't ship its own browser engine. Point Teardown at itself and it says so: *Teardown is a web interface running in the Mac's built-in WebKit, with a Rust core underneath.*
 

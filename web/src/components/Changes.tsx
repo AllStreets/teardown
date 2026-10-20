@@ -1,8 +1,8 @@
-import { CircleAlert, CircleCheck, CircleDot, History, RotateCw } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDot, ExternalLink, History, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ChangeEvent, Severity, WatchStatus } from "../../../shared/types";
+import type { Arrival, ChangeEvent, Severity, WatchStatus } from "../../../shared/types";
 import { api } from "../api";
-import { Button, Empty, Meter, PageHeader } from "./ui";
+import { Button, Dialog, Empty, Meter, PageHeader } from "./ui";
 
 export const SEVERITY_ICON: Record<Severity, typeof CircleDot> = { notable: CircleAlert, info: CircleDot, good: CircleCheck };
 
@@ -79,6 +79,8 @@ export function Changes({ onOpen }: { onOpen: (path: string) => void }) {
         </div>
       )}
 
+      <Arrivals onOpen={onOpen} />
+
       {events && events.length === 0 && (
         <Empty icon={History} title="No updates yet">
           <p>The first pass records how every app looks today. The next time one of them updates, the differences land here: new trackers, new permission requests, a different developer signing it.</p>
@@ -88,7 +90,7 @@ export function Changes({ onOpen }: { onOpen: (path: string) => void }) {
       <ol className="timeline">
         {events?.map((ev) => (
           <li key={ev.id} className="event">
-            <button className="event-head" onClick={() => onOpen(ev.path)}>
+            <button className="event-head" onClick={() => (location.hash = `#/change/${ev.id}`)}>
               <img src={api.icon(ev.path)} width={36} height={36} alt="" />
               <span className="event-title">
                 <strong>{ev.name}</strong>
@@ -101,5 +103,83 @@ export function Changes({ onOpen }: { onOpen: (path: string) => void }) {
         ))}
       </ol>
     </article>
+  );
+}
+
+// Apps that arrived but have never been opened, read before their first launch.
+function Arrivals({ onOpen }: { onOpen: (path: string) => void }) {
+  const [list, setList] = useState<Arrival[]>([]);
+  const [trash, setTrash] = useState<Arrival | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.arrivals().then((a) => alive && setList(a)).catch(() => {});
+    load();
+    const t = setInterval(load, 5_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+  if (!list.length) return null;
+  return (
+    <section className="arrivals" aria-label="Not opened yet">
+      <h2 className="panel-title">Not opened yet</h2>
+      <p className="panel-desc">These apps arrived on your Mac but have never run. Teardown read them first, so you can decide before they do anything.</p>
+      <ul>
+        {list.map((a) => {
+          const notable = a.findings.filter((f) => f.severity === "notable");
+          return (
+            <li key={a.path} className="arrival">
+              <button className="event-head" onClick={() => onOpen(a.path)}>
+                <img src={api.icon(a.path)} width={40} height={40} alt="" />
+                <span className="event-title">
+                  <strong>{a.name}{a.version ? ` ${a.version}` : ""}</strong>
+                  <span className="muted">
+                    {a.source ? `Downloaded with ${a.source}` : "Downloaded"}
+                    {a.from?.[0] ? ` from ${new URL(a.from[0]).hostname}` : ""}
+                    {a.quarantinedAt ? `, ${when(a.quarantinedAt)}` : ""}
+                  </span>
+                </span>
+              </button>
+              {a.verdict && <p className="arrival-verdict">{a.verdict}</p>}
+              {notable.length > 0 && (
+                <ul className="change-list">
+                  {notable.slice(0, 3).map((f, i) => (
+                    <li key={i} className="finding notable">
+                      <CircleAlert size={17} aria-hidden className="finding-icon" />
+                      <div><p className="finding-title">{f.title}</p><p className="finding-detail">{f.detail}</p></div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="arrival-actions">
+                <Button variant="primary" icon={ExternalLink} onClick={() => api.openArrival(a.path)}>Open it</Button>
+                <Button onClick={() => onOpen(a.path)}>Read the full teardown</Button>
+                <Button variant="danger" icon={Trash2} onClick={() => setTrash(a)}>Move to Trash</Button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <Dialog
+        open={!!trash}
+        title={`Move ${trash?.name} to the Trash?`}
+        onClose={() => setTrash(null)}
+        actions={<><Button variant="quiet" onClick={() => setTrash(null)}>Cancel</Button><Button variant="danger" icon={Trash2} busy={busy} onClick={async () => {
+          if (!trash) return;
+          setBusy(true);
+          try {
+            await api.trashArrival(trash.path);
+            setList((l) => l.filter((x) => x !== trash));
+            setTrash(null);
+          } finally {
+            setBusy(false);
+          }
+        }}>Move to Trash</Button></>}
+      >
+        <p>It has never been opened, so nothing of it has run. You can put it back from the Trash.</p>
+      </Dialog>
+    </section>
   );
 }

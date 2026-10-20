@@ -171,6 +171,7 @@ export interface StorageInfo {
   snapshots: { files: number; bytes: number };
   icons: { files: number; bytes: number };
   cleanupLog: number;
+  versions: { apps: number; copies: number };
 }
 
 export interface SelfConnections {

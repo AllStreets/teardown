@@ -7,6 +7,8 @@ import { Button, Dialog, PageHeader, Section, Select, SettingRow, Toggle } from 
 
 const TOC = [
   { id: "watching", label: "Watching" },
+  { id: "notifications", label: "Notifications" },
+  { id: "versions", label: "Saved versions" },
   { id: "cleanup", label: "Clean up" },
   { id: "hidden", label: "Hidden apps" },
   { id: "privacy", label: "Privacy policy" },
@@ -88,6 +90,23 @@ export function SettingsPage({ settings, onChange, apps }: { settings: Settings 
                 </SettingRow>
               </Section>
 
+              <Section id="notifications" title="Notifications" description="The Mac app sends these as macOS notifications, even with its window closed. Click one to jump straight to what happened.">
+                <SettingRow label="When an app updates" description="Notable means something that loosens privacy or security: a new tracker, a new permission request, a different signer, a dropped sandbox.">
+                  <Select label="Update notifications" value={settings.notifyUpdates} onChange={(v) => save({ notifyUpdates: v })} options={[
+                    { value: "notable", label: "Only notable changes" }, { value: "all", label: "Every update" }, { value: "off", label: "Never" },
+                  ]} />
+                </SettingRow>
+                <SettingRow label="When a new app arrives" description="Tells you about downloaded apps before their first launch, with what Teardown found inside.">
+                  <Toggle label="Arrival notifications" checked={settings.notifyArrivals} onChange={(v) => save({ notifyArrivals: v })} />
+                </SettingRow>
+              </Section>
+
+              <Section id="versions" title="Saved versions" description="So any update can be rolled back.">
+                <SettingRow label="Keep a copy of each app's current version" description={`Copies are APFS clones: they share space with the installed app and only take room once it updates. Up to three per app.${storage ? ` ${storage.versions.copies} copies kept for ${storage.versions.apps} apps.` : ""}`}>
+                  <Toggle label="Keep versions" checked={settings.keepVersions} onChange={(v) => save({ keepVersions: v })} />
+                </SettingRow>
+              </Section>
+
               <Section id="cleanup" title="Clean up" description="Nothing is ever deleted directly. Items go to the Trash, where you can put them back.">
                 <SettingRow label="Call an app unused after" description="Measured from the last time the app wrote to its own data folders.">
                   <Select label="Unused after" value={settings.staleDays} onChange={(v) => save({ staleDays: v })} options={[
@@ -140,7 +159,7 @@ export function SettingsPage({ settings, onChange, apps }: { settings: Settings 
               <h3>What it sends</h3>
               <p>Nothing. The window and the engine talk to each other over this Mac's own loopback address. To label connections on the Live page, Teardown asks your Mac's usual DNS resolver for the names and addresses of servers your apps reference or already talk to. That is the only network traffic it causes, and it contains nothing about you.</p>
               <h3>What it changes</h3>
-              <p>Only what you choose on the Clean up page, and only by moving it to the Trash. If an item is protected, macOS asks you before Finder moves it.</p>
+              <p>Only what you choose. Clean up and rollback move things to the Trash; taking back a permission asks macOS to reset it with Apple's tccutil. If an item is protected, macOS asks you first. To make rollback possible, Teardown keeps space-sharing copies of your apps in its own folder.</p>
               <h3>Deleting your data</h3>
               <p>Use the buttons below, or delete the folder. Uninstalling Teardown and removing that folder leaves no trace.</p>
             </div>

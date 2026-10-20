@@ -619,3 +619,64 @@ ul { margin: 0; padding: 0; list-style: none; }
 .edge-line { margin: 0 0 14px; font: 500 10.5px/1 var(--mono); letter-spacing: 0.28em; color: #7fd3ff; opacity: 0.5; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
 .page-head .edge-line { margin-bottom: 16px; }
 @media (max-width: 760px) { .plate-band { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; } }
+
+/* ---------- update scene ---------- */
+
+.back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); text-decoration: none; font-size: 14px; margin-bottom: 18px; }
+.back-link:hover { color: var(--bone); }
+.diff-arrow { color: var(--muted); }
+.diff-to { color: var(--amber); }
+.diff-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 36px; align-items: center; margin-top: 24px; }
+.diff-plate { border: 1px solid #16304a; border-radius: 4px; min-height: 420px; padding: 0; }
+.diff-plate svg { max-width: none; }
+.diff-plate .ghost path { fill: none; stroke: #7fd3ff; stroke-opacity: 0.3; stroke-dasharray: 3 4; }
+.diff-plate .new-part { filter: drop-shadow(0 0 9px #ffb547); animation: throb 1.6s ease-in-out infinite; }
+@keyframes throb { 50% { opacity: 0.6; } }
+.diff-callout .leader { stroke: var(--amber); stroke-opacity: 0.9; }
+.diff-callout .callout-dot { fill: var(--amber); }
+.diff-tag { font: 700 11px/1 var(--mono); letter-spacing: 0.18em; fill: var(--amber); }
+.diff-note { position: absolute; left: 20px; bottom: 14px; margin: 0; font-size: 13px; color: var(--muted); }
+.diff-verdict { font-size: 27px; margin-bottom: 14px; }
+.change-view .change-list { margin-left: 0; }
+.diff-actions { border-color: #ffb54744; box-shadow: 0 20px 60px -10px rgba(0,0,0,.6), 0 0 34px #ffb54718; }
+.diff-actions p { font-size: 14.5px; color: var(--bone-2); }
+.btn-primary.amber, .diff-actions .btn-primary { background: var(--amber); border-color: var(--amber); color: #1a0f00; box-shadow: 0 0 20px #ffb54755; }
+
+/* ---------- arrivals ---------- */
+
+.arrivals { margin: 8px 0 34px; padding: 22px 24px; border-radius: 14px; border: 1px solid #ffb54733; background: linear-gradient(180deg, #ffb5470d, transparent 70%); }
+.arrivals > ul { margin-top: 10px; }
+.arrival { padding: 16px 0; border-top: 1px solid var(--line-soft); }
+.arrival:first-child { border-top: 0; }
+.arrival-verdict { margin: 10px 0 0 54px; color: var(--bone-2); }
+.arrival .change-list { margin-left: 54px; }
+.arrival-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0 54px; }
+
+/* ---------- permissions ---------- */
+
+.perm-bulk { position: static; margin: 0 0 18px; }
+.perm-list li { display: flex; align-items: center; gap: 12px; padding: 7px 10px; margin: 0 -10px; border-radius: 9px; }
+.perm-list li:hover { background: var(--plate); }
+.perm-app { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; cursor: pointer; text-align: left; }
+.perm-app img { border-radius: 6px; }
+.perm-stale { color: #ffd59a; }
+.perm-na { font-size: 12.5px; }
+
+/* ---------- toasts ---------- */
+
+.toasts { position: fixed; top: 18px; right: 18px; z-index: 40; display: flex; flex-direction: column; gap: 10px; width: min(380px, calc(100vw - 36px)); }
+.toast {
+  display: flex; align-items: flex-start; gap: 8px; padding: 14px 12px 14px 16px; border-radius: 14px;
+  background: rgba(18, 36, 58, 0.96); border: 1px solid var(--line); backdrop-filter: blur(12px);
+  box-shadow: 0 24px 60px -10px rgba(0,0,0,.65); animation: toast-in 0.45s cubic-bezier(.2,1,.3,1);
+}
+.toast.notable { border-color: #ffb54766; box-shadow: 0 24px 60px -10px rgba(0,0,0,.65), 0 0 30px #ffb54722; }
+.toast.good { border-color: #6fe0b455; }
+.toast-body { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer; }
+.toast-body strong { font-weight: 650; }
+.toast-body span { color: var(--bone-2); font-size: 13.5px; }
+.toast-close { color: var(--muted); cursor: pointer; padding: 2px; border-radius: 6px; }
+.toast-close:hover { color: var(--bone); background: var(--plate-2); }
+@keyframes toast-in { from { transform: translateX(30px); opacity: 0; } }
+
+@media (max-width: 1100px) { .diff-grid { grid-template-columns: minmax(0, 1fr); } }

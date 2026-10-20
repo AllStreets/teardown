@@ -1,4 +1,5 @@
 import type {
+  Arrival, ChangeEvent as CE, Fingerprint, GrantsReport, Notice, SavedVersion,
   AppEntry, ChangeEvent, CleanupScan, LiveSnapshot, QuickReport, Report, SelfConnections, Settings, StorageInfo, TrashResult, WatchStatus,
 } from "../../shared/types";
 
@@ -30,6 +31,16 @@ export const api = {
   storage: () => call<StorageInfo>("/api/storage"),
   clear: (what: "cache" | "history") => post<void>(`/api/storage/clear?what=${what}`),
   self: () => call<SelfConnections & { version: string }>("/api/self"),
+  notices: (since: number) => call<Notice[]>(`/api/notifications?since=${since}`),
+  change: (id: string) => call<{ event: CE; before?: Fingerprint; after?: Fingerprint; versions: SavedVersion[] }>(`/api/change?id=${encodeURIComponent(id)}`),
+  versions: (path: string) => call<SavedVersion[]>(`/api/versions?path=${q(path)}`),
+  rollback: (path: string, savedAt: number) => post<{ version?: string }>("/api/rollback", { path, savedAt }),
+  arrivals: () => call<Arrival[]>("/api/arrivals"),
+  openArrival: (path: string) => post<void>("/api/arrivals/open", { path }),
+  trashArrival: (path: string) => post<void>("/api/arrivals/trash", { path }),
+  permissions: () => call<GrantsReport>("/api/permissions"),
+  revoke: (service: string, client: string) => post<{ ok: boolean; stillGranted: boolean; note?: string }>("/api/permissions/revoke", { service, client }),
+  openPrivacySettings: () => post<void>("/api/open-settings"),
   icon: (path: string) => `/api/icon?path=${q(path)}`,
   reveal: (path: string) => post<void>(`/api/reveal?path=${q(path)}`),
   openFolder: (target: "data" | "trash") => post<void>(`/api/reveal?target=${target}`),
