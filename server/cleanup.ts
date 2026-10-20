@@ -99,8 +99,10 @@ let offered = new Map<string, CleanupItem>();
 export async function scanCleanup(): Promise<CleanupScan> {
   const t0 = Date.now();
   const settings = await getSettings();
-  const apps = await findApps();
+  const apps = await findApps({ includeHidden: true });
+  const hidden = new Set(settings.hiddenApps);
   const quick = await pool(apps, 4, (a) => getQuick(a.path).catch(() => undefined));
+  const hiddenNames = new Set(apps.map((a, i) => (hidden.has(a.path) ? quick[i]?.name : undefined)).filter(Boolean) as string[]);
   const installed = new Map<string, string>();
   for (const q of quick) if (q?.bundleId) installed.set(q.bundleId.toLowerCase(), q.name);
   const vendors = new Map<string, string>();
@@ -150,6 +152,7 @@ export async function scanCleanup(): Promise<CleanupScan> {
 
   const sized = await pool(candidates, 6, async (c) => ({ ...c, bytes: await du(c.path) }));
   for (const c of sized) {
+    if (c.owner && hiddenNames.has(c.owner)) continue;
     if (c.category === "caches" && c.bytes < 20e6) continue;
     if (c.category === "leftovers" && c.bytes < 4096 && !c.path.includes("/Preferences/")) continue;
     items.push(c);
@@ -158,7 +161,7 @@ export async function scanCleanup(): Promise<CleanupScan> {
   // Apps you haven't opened in a long time, and apps that only run through Rosetta.
   const running = await runningApps();
   const cutoff = Date.now() - settings.staleDays * 86_400_000;
-  await pool(apps.filter((a) => a.location !== "system"), 4, async (a) => {
+  await pool(apps.filter((a) => a.location !== "system" && !hidden.has(a.path)), 4, async (a) => {
     const q = quick[apps.indexOf(a)];
     const used = await lastUsed(a.path, q?.bundleId, q?.name);
     if (!running.has(a.path) && used !== undefined && used < cutoff) {

@@ -4,6 +4,7 @@ import type { Connection, LiveApp, LiveSnapshot, SelfConnections } from "../shar
 import { cachedFull } from "./apps.js";
 import { PORT } from "./paths.js";
 import { run } from "./run.js";
+import { getSettings } from "./store.js";
 
 interface Socket {
   pid: number;
@@ -118,12 +119,14 @@ let last: { at: number; data: LiveSnapshot } | undefined;
 
 export async function liveConnections(): Promise<LiveSnapshot> {
   if (last && Date.now() - last.at < 2_500) return last.data;
+  last = undefined;
   const [socks, paths] = await Promise.all([sockets(), processPaths()]);
+  const hidden = new Set((await getSettings()).hiddenApps);
   const byApp = new Map<string, Socket[]>();
   for (const s of socks) {
     const exe = paths.get(s.pid);
     const app = exe && appOf(exe);
-    if (!app) continue;
+    if (!app || hidden.has(app)) continue;
     byApp.set(app, [...(byApp.get(app) ?? []), s]);
   }
 

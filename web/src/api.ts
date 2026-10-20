@@ -16,7 +16,7 @@ const post = <T,>(url: string, body?: unknown) =>
   call<T>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
 
 export const api = {
-  apps: () => call<AppEntry[]>("/api/apps"),
+  apps: (all = false) => call<AppEntry[]>(`/api/apps${all ? "?all=1" : ""}`),
   quick: (path: string) => call<QuickReport>(`/api/quick?path=${q(path)}`),
   teardown: (path: string, fresh = false) => call<Report>(`/api/teardown?path=${q(path)}${fresh ? "&fresh=1" : ""}`),
   history: (path: string) => call<{ snapshots: { version?: string; takenAt: number }[]; changes: ChangeEvent[] }>(`/api/history?path=${q(path)}`),

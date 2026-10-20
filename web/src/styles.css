@@ -33,7 +33,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-button { font: inherit; color: inherit; }
+/* WebKit draws native gray buttons unless every default is cleared. */
+button { font: inherit; color: inherit; -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0; text-align: inherit; }
+a { color: inherit; }
 code { font: 400 12.5px/1.5 var(--mono); color: var(--bone-2); }
 h1, h2, h3, p { margin: 0; }
 ul { margin: 0; padding: 0; list-style: none; }
@@ -83,7 +85,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   color: var(--bone-2); text-decoration: none;
 }
 .rail-item:hover { background: var(--plate); color: var(--bone); }
-.rail-item.active { background: var(--plate-2); color: var(--bone); box-shadow: inset 2px 0 0 var(--phosphor); }
+.rail-item.active { background: #7fd3ff14; color: var(--bone); box-shadow: inset 2px 0 0 var(--phosphor); }
+.rail-item.active .rail-name { font-weight: 600; }
 .rail-item img { border-radius: 5px; flex: none; }
 .rail-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -533,3 +536,13 @@ ul { margin: 0; padding: 0; list-style: none; }
   .conn-proc { display: none; }
   .change-list { margin-left: 0; }
 }
+
+.hide-form { display: flex; gap: 8px; }
+.text-input {
+  height: 34px; width: 220px; padding: 0 12px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--plate); color: var(--bone); font: 500 13.5px/1 var(--body); outline: none;
+}
+.text-input:focus { border-color: #2f5577; box-shadow: 0 0 0 3px #7fd3ff1a; }
+.hidden-empty { padding: 8px 0; font-size: 14px; }
+.hidden-list li { display: grid; grid-template-columns: 160px 1fr auto; align-items: center; gap: 14px; padding: 6px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
+.hidden-list code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }

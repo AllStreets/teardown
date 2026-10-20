@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   intervalMinutes: 30,
   includeSystem: true,
   staleDays: 180,
+  hiddenApps: [],
 };
 
 let current: Settings | undefined;
@@ -40,6 +41,9 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
     intervalMinutes: [15, 30, 60, 360, 1440].includes(Number(patch.intervalMinutes)) ? Number(patch.intervalMinutes) : s.intervalMinutes,
     includeSystem: typeof patch.includeSystem === "boolean" ? patch.includeSystem : s.includeSystem,
     staleDays: [90, 180, 365, 730].includes(Number(patch.staleDays)) ? Number(patch.staleDays) : s.staleDays,
+    hiddenApps: Array.isArray(patch.hiddenApps)
+      ? [...new Set(patch.hiddenApps.filter((p): p is string => typeof p === "string" && p.endsWith(".app")))].sort()
+      : s.hiddenApps,
   };
   current = next;
   await writeJson(SETTINGS_FILE, next);

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+    <linearGradient id="wire" x1="0" x2="1"><stop offset="0" stop-color="#7FD3FF" stop-opacity=".15"/><stop offset="1" stop-color="#7FD3FF" stop-opacity=".7"/></linearGradient>
+  </defs>
+  <rect width="1200" height="520" rx="24" fill="#07111C"/>
+  <rect x=".5" y=".5" width="1199" height="519" rx="23.5" fill="none" stroke="#1C3149"/>
+  <text x="60" y="64" fill="#6C8299" font-size="15" font-weight="600">In the bundle</text>
+  <text x="840" y="64" fill="#6C8299" font-size="15" font-weight="600">What you read</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#B5C6DA">
+    <rect x="48" y="92" width="440" height="56" rx="10" fill="#0D1B2A" stroke="#1C3149"/>
+    <text x="68" y="126">Frameworks/Electron Framework.framework</text>
+    <rect x="48" y="166" width="440" height="56" rx="10" fill="#0D1B2A" stroke="#1C3149"/>
+    <text x="68" y="200">Resources/app.asar  node_modules/@sentry</text>
+    <rect x="48" y="240" width="440" height="56" rx="10" fill="#0D1B2A" stroke="#1C3149"/>
+    <text x="68" y="274">Info.plist  NSMicrophoneUsageDescription</text>
+    <rect x="48" y="314" width="440" height="56" rx="10" fill="#0D1B2A" stroke="#1C3149"/>
+    <text x="68" y="348">codesign  flags=0x10000(runtime)</text>
+    <rect x="48" y="388" width="440" height="56" rx="10" fill="#0D1B2A" stroke="#1C3149"/>
+    <text x="68" y="422">strings  https://api.segment.io</text>
+  </g>
+  <g fill="none" stroke="url(#wire)" stroke-width="2">
+    <path d="M488 120 C600 120 600 260 660 260"/>
+    <path d="M488 194 C600 194 600 260 660 260"/>
+    <path d="M488 268 C600 268 600 260 660 260"/>
+    <path d="M488 342 C600 342 600 260 660 260"/>
+    <path d="M488 416 C600 416 600 260 660 260"/>
+    <path d="M740 260 C780 260 780 124 830 124"/>
+    <path d="M740 260 C780 260 780 192 830 192"/>
+    <path d="M740 260 C780 260 780 260 830 260"/>
+    <path d="M740 260 C780 260 780 328 830 328"/>
+    <path d="M740 260 C780 260 780 396 830 396"/>
+  </g>
+  <circle cx="700" cy="260" r="40" fill="#7FD3FF" opacity=".35" filter="url(#glow)"/>
+  <circle cx="700" cy="260" r="34" fill="#0D1B2A" stroke="#7FD3FF" stroke-width="2"/>
+  <g transform="translate(676 236) scale(0.75)" fill="none">
+    <path d="M32 19.5A12.5 12.5 0 0 1 44.4 33.7" stroke="#7FD3FF" stroke-width="5"/>
+    <path d="M44.3 34.5A12.5 12.5 0 0 1 22 40.5" stroke="#7FD3FF" stroke-width="5"/>
+    <path d="M21.4 39.6A12.5 12.5 0 0 1 30.3 19.6" stroke="#7FD3FF" stroke-width="5"/>
+    <path d="M37.8 6.4A21.5 21.5 0 0 1 54 18" stroke="#E6F1FF" stroke-width="6.5"/>
+    <circle cx="32" cy="32" r="4.6" fill="#E6F1FF"/>
+  </g>
+  <g font-size="17" fill="#E6F1FF">
+    <text x="840" y="130">A web app packaged with Electron</text>
+    <text x="840" y="198">Crash reports go to Sentry</text>
+    <text x="840" y="266">Can ask to use your microphone</text>
+    <text x="840" y="334" fill="#6FE0B4">Hardened runtime on</text>
+    <text x="840" y="402" fill="#FFD59A">Sends usage analytics to Segment</text>
+  </g>
+  <text x="60" y="488" fill="#6C8299" font-size="14">Every conclusion is shown next to the file or signature that proves it.</text>
+</svg>

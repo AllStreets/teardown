@@ -1,6 +1,6 @@
 import { CircleCheck, CircleAlert, ExternalLink, FolderOpen, RotateCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import type { SelfConnections, Settings, StorageInfo } from "../../../shared/types";
+import type { AppEntry, SelfConnections, Settings, StorageInfo } from "../../../shared/types";
 import { api } from "../api";
 import { bytes } from "../format";
 import { Button, Dialog, PageHeader, Section, Select, SettingRow, Toggle } from "./ui";
@@ -8,6 +8,7 @@ import { Button, Dialog, PageHeader, Section, Select, SettingRow, Toggle } from 
 const TOC = [
   { id: "watching", label: "Watching" },
   { id: "cleanup", label: "Clean up" },
+  { id: "hidden", label: "Hidden apps" },
   { id: "privacy", label: "Privacy policy" },
   { id: "data", label: "Data on this Mac" },
   { id: "connections", label: "Connections" },
@@ -25,7 +26,8 @@ const TOOLS: [string, string][] = [
   ["open, osascript", "Show in Finder, and asking Finder to move protected items to the Trash"],
 ];
 
-export function SettingsPage({ settings, onChange }: { settings: Settings | null; onChange: (s: Settings) => void }) {
+export function SettingsPage({ settings, onChange, apps }: { settings: Settings | null; onChange: (s: Settings) => void; apps: AppEntry[] }) {
+  const [hideQuery, setHideQuery] = useState("");
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [self, setSelf] = useState<(SelfConnections & { version: string }) | null>(null);
   const [checking, setChecking] = useState(false);
@@ -94,6 +96,37 @@ export function SettingsPage({ settings, onChange }: { settings: Settings | null
                 </SettingRow>
               </Section>
             </>
+          )}
+
+          {settings && (
+            <Section id="hidden" title="Hidden apps" description="Apps you'd rather Teardown left alone. They disappear from every page, including Live and Clean up, and their data is never offered for deletion.">
+              <SettingRow label="Hide an app" description="Start typing a name, then pick it from the list.">
+                <form className="hide-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  const hit = apps.find((a) => a.name.toLowerCase() === hideQuery.trim().toLowerCase());
+                  if (hit) {
+                    save({ hiddenApps: [...settings.hiddenApps, hit.path] });
+                    setHideQuery("");
+                  }
+                }}>
+                  <input className="text-input" list="hide-apps" value={hideQuery} onChange={(e) => setHideQuery(e.target.value)} placeholder="App name" aria-label="App to hide" />
+                  <datalist id="hide-apps">
+                    {apps.filter((a) => !settings.hiddenApps.includes(a.path)).map((a) => <option key={a.path} value={a.name} />)}
+                  </datalist>
+                  <Button type="submit" disabled={!apps.some((a) => a.name.toLowerCase() === hideQuery.trim().toLowerCase())}>Hide</Button>
+                </form>
+              </SettingRow>
+              {settings.hiddenApps.length === 0 && <p className="muted hidden-empty">Nothing hidden.</p>}
+              <ul className="hidden-list">
+                {settings.hiddenApps.map((p) => (
+                  <li key={p}>
+                    <span>{apps.find((a) => a.path === p)?.name ?? p.split("/").pop()?.replace(/\.app$/, "")}</span>
+                    <code className="muted">{p}</code>
+                    <Button variant="quiet" onClick={() => save({ hiddenApps: settings.hiddenApps.filter((x) => x !== p) })}>Show again</Button>
+                  </li>
+                ))}
+              </ul>
+            </Section>
           )}
 
           <Section id="privacy" title="Privacy policy" description="Last updated October 2026. Plain language, because there isn't much to say.">

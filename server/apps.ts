@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AppEntry, QuickReport, Report } from "../shared/types.js";
 import { fullReport, layout, quickReport } from "./analyze.js";
 import { REPORT_DIR } from "./paths.js";
-import { readJson, writeJson } from "./store.js";
+import { getSettings, readJson, writeJson } from "./store.js";
 
 const LOCATIONS: [string, AppEntry["location"]][] = [
   ["/Applications", "applications"],
@@ -13,7 +13,8 @@ const LOCATIONS: [string, AppEntry["location"]][] = [
   ["/System/Applications/Utilities", "system"],
 ];
 
-export async function findApps(): Promise<AppEntry[]> {
+export async function findApps(opts: { includeHidden?: boolean } = {}): Promise<AppEntry[]> {
+  const hidden = new Set(opts.includeHidden ? [] : (await getSettings()).hiddenApps);
   const apps: AppEntry[] = [];
   for (const [dir, location] of LOCATIONS) {
     let names: string[] = [];
@@ -35,7 +36,7 @@ export async function findApps(): Promise<AppEntry[]> {
       }
     }
   }
-  return apps.sort((a, b) => a.name.localeCompare(b.name));
+  return apps.filter((a) => !hidden.has(a.path)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Only real app bundles may be analysed.

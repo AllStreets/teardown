@@ -60,12 +60,16 @@ export function App() {
   }, []);
 
   // Read every installed app in the background so the overview fills in live.
+  const settingsReady = settings !== null;
   useEffect(() => {
+    if (!settingsReady) return;
     let cancelled = false;
-    api.apps().then(async (list) => {
+    api.apps(true).then(async (list) => {
       if (cancelled) return;
       setApps(list);
-      const queue = [...list.filter((a) => a.location !== "system"), ...list.filter((a) => a.location === "system")];
+      const hidden = new Set(settings?.hiddenApps ?? []);
+      const visibleList = list.filter((a) => !hidden.has(a.path));
+      const queue = [...visibleList.filter((a) => a.location !== "system"), ...visibleList.filter((a) => a.location === "system")];
       const worker = async () => {
         while (queue.length && !cancelled) {
           const a = queue.shift()!;
@@ -80,7 +84,8 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsReady]);
 
   // Counts shown next to each page in the sidebar.
   useEffect(() => {
@@ -125,7 +130,10 @@ export function App() {
     }
   }, [selected]);
 
-  const shownApps = useMemo(() => apps.filter((a) => settings?.includeSystem !== false || a.location !== "system"), [apps, settings]);
+  const shownApps = useMemo(() => {
+    const hidden = new Set(settings?.hiddenApps ?? []);
+    return apps.filter((a) => !hidden.has(a.path) && (settings?.includeSystem !== false || a.location !== "system"));
+  }, [apps, settings]);
   const visible = useMemo(() => {
     const f = filter.trim().toLowerCase();
     return f ? shownApps.filter((a) => a.name.toLowerCase().includes(f) || quick[a.path]?.stackLabel.toLowerCase().includes(f)) : shownApps;
@@ -205,7 +213,7 @@ export function App() {
             }}
           />
         )}
-        {route.page === "settings" && <SettingsPage settings={settings} onChange={setSettings} />}
+        {route.page === "settings" && <SettingsPage settings={settings} onChange={setSettings} apps={apps} />}
         {route.page === "app" && (
           <>
             {loading && (!report || report.path !== selected) && <Scanning name={selectedName ?? "app"} />}

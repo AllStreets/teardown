@@ -27,8 +27,8 @@ const wrap = (fn: (req: express.Request, res: express.Response) => Promise<unkno
   fn(req, res).catch((e: Error) => res.status(500).json({ error: e.message }));
 };
 
-app.get("/api/apps", wrap(async (_req, res) => {
-  res.json(await findApps());
+app.get("/api/apps", wrap(async (req, res) => {
+  res.json(await findApps({ includeHidden: req.query.all === "1" }));
 }));
 
 app.get("/api/quick", wrap(async (req, res) => {
@@ -53,7 +53,8 @@ app.get("/api/history", wrap(async (req, res) => {
 }));
 
 app.get("/api/changes", wrap(async (_req, res) => {
-  res.json({ events: await readChanges(), status: watchStatus() });
+  const hidden = new Set((await getSettings()).hiddenApps);
+  res.json({ events: (await readChanges()).filter((e) => !hidden.has(e.path)), status: watchStatus() });
 }));
 
 app.post("/api/changes/check", wrap(async (_req, res) => {

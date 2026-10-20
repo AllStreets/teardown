@@ -158,6 +158,8 @@ export interface Settings {
   intervalMinutes: number;
   includeSystem: boolean;
   staleDays: number;
+  // Apps Teardown leaves out of every page, by bundle path.
+  hiddenApps: string[];
 }
 
 export interface StorageInfo {
