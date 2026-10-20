@@ -228,6 +228,19 @@ app.get(/^\/(?!api\/).*/, (_req, res, next) => {
   res.sendFile(path.join(DIST_DIR, "index.html"), (err) => err && next());
 });
 
+// Started by the Mac app: if the app goes away without cleaning up, don't linger holding the port.
+if (process.env.TEARDOWN_APP) {
+  const parent = process.ppid;
+  setInterval(() => {
+    try {
+      process.kill(parent, 0);
+    } catch {
+      process.exit(0);
+    }
+    if (process.ppid !== parent) process.exit(0);
+  }, 3_000).unref();
+}
+
 app.listen(PORT, "127.0.0.1", () => {
   console.log(`Teardown engine on http://127.0.0.1:${PORT} (data in ${DATA_DIR})`);
   startWatching().catch(() => {});

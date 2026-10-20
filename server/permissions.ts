@@ -73,7 +73,10 @@ export async function readGrants(): Promise<GrantsReport> {
   for (const [db, scope] of DBS) {
     const r = await run("/usr/bin/sqlite3", ["-readonly", "-json", db, SQL], 8_000);
     if (!r.ok) {
-      reason = /authorization denied|unable to open/i.test(r.stderr) ? "Teardown needs Full Disk Access to read the permissions you've granted." : r.stderr.trim();
+      const detail = r.stderr.trim().split("\n")[0];
+      reason = /authorization denied|unable to open|not permitted/i.test(r.stderr)
+        ? `Teardown needs Full Disk Access to read the permissions you've granted. macOS said: ${detail}`
+        : detail;
       continue;
     }
     readable = true;

@@ -69,6 +69,8 @@ export function Permissions({ onOpen }: { onOpen: (path: string) => void }) {
       {report && !report.readable && (
         <Empty icon={KeyRound} title="Teardown can't read your permission records yet">
           <p>macOS keeps them behind Full Disk Access. Turn it on for Teardown in System Settings, then refresh. Teardown only reads them; it never changes a permission without you pressing a button.</p>
+          <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>If you've already turned it on: remove every Teardown entry in that list, add /Applications/Teardown.app once, then quit Teardown from the menu bar and reopen it. macOS ties the permission to one exact build of the app.</p>
+          {report.reason && <p className="muted" style={{ marginTop: 6, fontSize: 12.5, fontFamily: "var(--mono)" }}>{report.reason}</p>}
           <p style={{ marginTop: 12 }}><Button variant="primary" icon={LockOpen} onClick={() => api.openPrivacySettings()}>Open Full Disk Access settings</Button></p>
         </Empty>
       )}
