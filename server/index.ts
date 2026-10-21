@@ -32,6 +32,21 @@ const wrap = (fn: (req: express.Request, res: express.Response) => Promise<unkno
   fn(req, res).catch((e: Error) => res.status(500).json({ error: e.message }));
 };
 
+// Another app (Assay) can ask Teardown to show a page. The Mac shell polls for it and brings the
+// window forward on that page; it only accepts Teardown's own routes.
+let focusTarget: string | undefined;
+app.post("/api/focus", (req, res) => {
+  const t = String(req.body?.target ?? "");
+  if (!/^#\/(app\/[^\s]+|changes|permissions|startup|live|cleanup)?$/.test(t)) return res.status(400).json({ error: "Unknown page." });
+  focusTarget = t;
+  res.json({ ok: true });
+});
+app.get("/api/focus", (_req, res) => {
+  const t = focusTarget;
+  focusTarget = undefined;
+  res.json({ target: t ?? null });
+});
+
 app.get("/api/apps", wrap(async (req, res) => {
   res.json(await findApps({ includeHidden: req.query.all === "1" }));
 }));

@@ -96,6 +96,25 @@ fn watch_notices(app: AppHandle) {
     });
 }
 
+// Assay can ask Teardown to open a page (an app's X-ray, Permissions, Changes). The engine holds
+// the request; this picks it up and brings the window forward on it.
+fn watch_focus(app: AppHandle) {
+    thread::spawn(move || loop {
+        let target = ureq::get(&format!("{}api/focus", base()))
+            .timeout(Duration::from_secs(2))
+            .call()
+            .ok()
+            .and_then(|r| r.into_string().ok())
+            .and_then(|b| serde_json::from_str::<serde_json::Value>(&b).ok())
+            .and_then(|v| v["target"].as_str().map(String::from));
+        if let Some(t) = target {
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || show(&handle, Some(&t)));
+        }
+        thread::sleep(Duration::from_millis(700));
+    });
+}
+
 fn main() {
     let app = tauri::Builder::default()
         .manage(Engine(Mutex::new(None)))
@@ -161,6 +180,7 @@ fn main() {
                 let _ = window.navigate(Url::parse(&base()).unwrap());
             });
             watch_notices(app.handle().clone());
+            watch_focus(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
