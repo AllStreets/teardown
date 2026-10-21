@@ -19,7 +19,8 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(ENGINE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  // The engine only accepts state changes from its own pages, so the tool identifies as one.
+  const r = await fetch(ENGINE + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: ENGINE }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `Engine returned ${r.status}`);
   return (r.status === 204 ? undefined : r.json()) as Promise<T>;
 }

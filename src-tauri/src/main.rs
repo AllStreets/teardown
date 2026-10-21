@@ -164,7 +164,7 @@ fn main() {
                     "changes" => show(app, Some("#/changes")),
                     "check" => {
                         thread::spawn(|| {
-                            let _ = ureq::post(&format!("{}api/changes/check", base())).timeout(Duration::from_secs(4)).call();
+                            let _ = ureq::post(&format!("{}api/changes/check", base())).set("Origin", base().trim_end_matches('/')).timeout(Duration::from_secs(4)).call();
                         });
                     }
                     "quit" => app.exit(0),

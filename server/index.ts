@@ -19,12 +19,22 @@ import { dirStats, getSettings, readJson, updateSettings } from "./store.js";
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-// The UI and engine talk over localhost only; refuse anything that isn't from this machine.
+// Only Teardown's own pages may call the engine. The Host check stops a web page reaching it
+// through DNS rebinding; requiring a matching Origin on anything that changes state stops other
+// sites, other local servers' pages and other programs from triggering actions. Assay may also
+// ask Teardown to show a page, and nothing else.
+const OWN_PORTS = new Set([String(PORT), "4711"]);
+const ASSAY_PORTS = new Set(["4720", "4721"]);
+const hostPort = (h: string) => h.match(/^(127\.0\.0\.1|localhost)(?::(\d+))?$/)?.[2] ?? (/^(127\.0\.0\.1|localhost)$/.test(h) ? "80" : undefined);
+const originPort = (o: string) => (o === "tauri://localhost" ? String(PORT) : hostPort(o.replace(/^https?:\/\//, "")));
 app.use("/api", (req, res, next) => {
+  const hp = hostPort(req.headers.host ?? "");
+  if (!hp || !OWN_PORTS.has(hp)) return res.status(403).json({ error: "Teardown only answers requests from this Mac." });
   const origin = req.headers.origin;
-  if (origin && !/^(https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?|tauri:\/\/localhost)$/.test(origin)) {
-    return res.status(403).json({ error: "Teardown only answers requests from this Mac." });
-  }
+  const op = origin ? originPort(origin) : undefined;
+  const allowed = !!op && (OWN_PORTS.has(op) || (ASSAY_PORTS.has(op) && req.path === "/focus"));
+  const changes = req.method !== "GET" && req.method !== "HEAD";
+  if ((origin && !allowed) || (changes && !origin)) return res.status(403).json({ error: "Teardown only answers requests from its own window." });
   next();
 });
 
